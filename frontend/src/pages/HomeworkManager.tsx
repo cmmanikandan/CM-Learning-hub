@@ -45,6 +45,93 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
 
+  // Page tabs and Calendar scheduling (Teacher)
+  const [activePageTab, setActivePageTab] = useState<'today' | 'history'>('today');
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  const HOMEWORK_SUGGESTIONS = [
+    {
+      subject: "Mathematics",
+      title: "Algebraic Equations Practice",
+      description: "Complete the worksheet on linear equations. Solve exercises 1-15 showing all steps.",
+      priority: "High" as const,
+      estimatedTime: 45,
+      remarks: "Focus on variable isolation and balancing equations."
+    },
+    {
+      subject: "Physics",
+      title: "Light Refraction Problems",
+      description: "Read chapter 6 on refraction. Solve refraction indices questions 1 to 10 on index formulas.",
+      priority: "Medium" as const,
+      estimatedTime: 30,
+      remarks: "Remember Snell's law formula: n1 sin(i) = n2 sin(r)."
+    },
+    {
+      subject: "Chemistry",
+      title: "Balancing Chemical Equations",
+      description: "Balance the 10 chemical reaction equations provided in the handout and state reaction types.",
+      priority: "Medium" as const,
+      estimatedTime: 30,
+      remarks: "Review oxidation states if stuck."
+    },
+    {
+      subject: "Biology",
+      title: "Photosynthesis Diagram & Summary",
+      description: "Draw a clean diagram of a plant chloroplast showing light reactions. Write short summaries of the Calvin cycle.",
+      priority: "Low" as const,
+      estimatedTime: 40,
+      remarks: "Color coding the stages will earn extra credit."
+    },
+    {
+      subject: "English",
+      title: "Grammar & Tenses Revision",
+      description: "Write a short essay (200 words) using past perfect continuous and future progressive tenses describing a journey.",
+      priority: "Low" as const,
+      estimatedTime: 25,
+      remarks: "Check verb agreement carefully."
+    }
+  ];
+
+  const renderCalendar = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    const days: React.ReactNode[] = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="p-2 text-transparent">.</div>);
+    }
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isSelected = selectedScheduleDate === dateStr;
+      const hasHomework = homeworkList.some(hw => hw.date === dateStr);
+      
+      days.push(
+        <button
+          key={d}
+          type="button"
+          onClick={() => setSelectedScheduleDate(dateStr)}
+          className={`p-2.5 border rounded-xl flex flex-col items-center justify-between transition-all relative ${
+            isSelected 
+              ? 'bg-primary-500 border-primary-500 text-white shadow-md shadow-primary-500/25' 
+              : 'border-slate-100 dark:border-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-slate-850 dark:text-slate-200'
+          }`}
+        >
+          <span className="text-xs font-black">{d}</span>
+          {hasHomework && (
+            <span className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-primary-500'}`} />
+          )}
+        </button>
+      );
+    }
+    return days;
+  };
+
   // Target assignment states
   const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -403,6 +490,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
               <button 
                 onClick={() => {
                   setEditingHw(null);
+                  setFormData(prev => ({ ...prev, date: selectedScheduleDate }));
                   setShowCreateModal(true);
                 }}
                 className="flex items-center px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 transition-all shadow-sm active:scale-95"
@@ -413,159 +501,360 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
             </div>
           </div>
 
-          {/* Filtering Controls */}
-          <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search homework..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800 pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none focus:border-primary-500"
-              />
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={subjectFilter}
-                onChange={(e) => setSubjectFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
-              >
-                <option value="">All Subjects</option>
-                {subjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
-              >
-                <option value="">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Completed">Completed</option>
-              </select>
-
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
-              >
-                <option value="">All Priorities</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
+          {/* Page Tabs */}
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              onClick={() => setActivePageTab('today')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
+                activePageTab === 'today'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20'
+                  : 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 border-blue-200/50 dark:border-slate-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
+              }`}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              Today's Schedule & Calendar
+            </button>
+            <button
+              onClick={() => setActivePageTab('history')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
+                activePageTab === 'history'
+                  ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-purple-500 shadow-md shadow-purple-550/20'
+                  : 'bg-white dark:bg-slate-800 text-purple-650 dark:text-purple-400 border-purple-200/50 dark:border-slate-700 hover:bg-purple-50/50 dark:hover:bg-purple-950/10'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Homework History
+            </button>
           </div>
 
-          {/* Homework Table */}
-          <div className="glass-panel rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 text-[11px] uppercase tracking-wider font-bold border-b border-slate-100 dark:border-slate-800">
-                    <th className="px-5 py-3.5">Assign Date</th>
-                    <th className="px-5 py-3.5">Subject</th>
-                    <th className="px-5 py-3.5">Type</th>
-                    <th className="px-5 py-3.5">Homework Title</th>
-                    <th className="px-5 py-3.5">Priority</th>
-                    <th className="px-5 py-3.5">Student Completion</th>
-                    <th className="px-5 py-3.5">Progress</th>
-                    <th className="px-5 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300">
-                  {filteredHomeworkList.length > 0 ? (
-                    filteredHomeworkList.map((hw) => (
-                      <tr key={hw.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="px-5 py-4 font-semibold text-xs whitespace-nowrap">{hw.date}</td>
-                        <td className="px-5 py-4 font-bold font-outfit text-xs text-primary-600 dark:text-primary-400">{hw.subject}</td>
-                        <td className="px-5 py-4 text-xs whitespace-nowrap text-slate-500">{hw.homeworkType}</td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-slate-800 dark:text-white font-outfit">{hw.title}</p>
-                          </div>
-                          <p className="text-xs text-slate-400 truncate max-w-[200px] mt-0.5">{hw.description}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            hw.priority === 'High' ? 'bg-danger-50 text-danger-600 dark:bg-danger-950/20 dark:text-danger-400' :
-                            hw.priority === 'Medium' ? 'bg-warning-50 text-warning-600 dark:bg-warning-950/20 dark:text-warning-400' :
-                            'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}>
-                            {hw.priority}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col gap-1 max-w-[160px]">
-                            {hw.students && hw.students.length > 0 ? (
-                              hw.students.map((s, idx) => (
-                                <div key={idx} className="flex items-center space-x-2 text-xs">
-                                  <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === 'Completed' ? 'bg-success-500 shadow-sm shadow-success-500/20' : 'bg-slate-350 dark:bg-slate-650'}`} />
-                                  <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">{s.student_name}</span>
+          {activePageTab === 'today' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Calendar Column */}
+              <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <CalendarIcon className="w-4.5 h-4.5 text-primary-500" />
+                  <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                    Schedule Calendar
+                  </h3>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
+                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {renderCalendar()}
+                </div>
+                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
+                  <p className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                    Dots indicate dates with assigned homework.
+                  </p>
+                  <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+                </div>
+              </div>
+
+              {/* Day Assignments Column */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h3 className="font-bold text-base text-slate-800 dark:text-white font-outfit">
+                      Assignments on {selectedScheduleDate}
+                    </h3>
+                    <span className="text-xs text-slate-405 dark:text-slate-400 font-extrabold bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-full">
+                      {homeworkList.filter(hw => hw.date === selectedScheduleDate).length} Tasks
+                    </span>
+                  </div>
+
+                  {homeworkList.filter(hw => hw.date === selectedScheduleDate).length > 0 ? (
+                    <div className="space-y-4">
+                      {homeworkList.filter(hw => hw.date === selectedScheduleDate).map((hw) => (
+                        <div key={hw.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-150 dark:border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-[10px] font-black bg-primary-50 text-primary-600 dark:bg-primary-950/20 dark:text-primary-450 px-2 py-0.5 rounded">
+                                {hw.subject}
+                              </span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                                hw.priority === 'High' ? 'bg-danger-50 text-danger-600 dark:bg-danger-955/20' :
+                                hw.priority === 'Medium' ? 'bg-warning-50 text-warning-600 dark:bg-warning-955/20' :
+                                'bg-slate-100 text-slate-600 dark:bg-slate-800'
+                              }`}>
+                                {hw.priority} Priority
+                              </span>
+                            </div>
+                            <h4 className="font-extrabold text-sm text-slate-800 dark:text-white font-outfit">{hw.title}</h4>
+                            <p className="text-xs text-slate-555 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2">{hw.description}</p>
+                            
+                            {/* Student Progress and Completion Rate */}
+                            <div className="mt-3 flex flex-wrap items-center gap-4 bg-slate-100/40 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-200/5">
+                              <div className="flex flex-col gap-1 min-w-[120px]">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Student Completion</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {hw.students && hw.students.length > 0 ? (
+                                    hw.students.map((s, idx) => (
+                                      <div key={idx} className="flex items-center space-x-1 bg-white dark:bg-slate-900 border border-slate-200/10 px-2 py-0.5 rounded text-[10px]">
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.status === 'Completed' ? 'bg-success-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                                        <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[90px]">{s.student_name}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 font-bold">General Assignment</span>
+                                  )}
                                 </div>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400 font-bold">General Assignment</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col gap-1.5 min-w-[100px]">
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full self-start ${
-                              hw.completion_percentage === 100 
-                                ? 'bg-success-50 text-success-600 dark:bg-success-950/20 dark:text-success-400' 
-                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
-                            }`}>
-                              {hw.completion_percentage}% Done
-                            </span>
-                            <div className="w-20 bg-slate-150 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-300 ${hw.completion_percentage === 100 ? 'bg-success-500' : 'bg-amber-500'}`}
-                                style={{ width: `${hw.completion_percentage}%` }}
-                              />
+                              </div>
+                              <div className="flex flex-col gap-1 min-w-[100px]">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Progress</span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                                    hw.completion_percentage === 100 
+                                      ? 'bg-success-50 text-success-600 dark:bg-success-950/20 dark:text-success-400' 
+                                      : 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
+                                  }`}>
+                                    {hw.completion_percentage}%
+                                  </span>
+                                  <div className="w-16 bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full rounded-full transition-all duration-300 ${hw.completion_percentage === 100 ? 'bg-success-500' : 'bg-amber-500'}`}
+                                      style={{ width: `${hw.completion_percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end space-x-1.5">
-                            <button 
+                          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                            <button
                               onClick={() => startEdit(hw)}
-                              className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 rounded-lg transition-colors"
+                              className="p-2 text-slate-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 rounded-lg transition-all"
                               title="Edit"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => duplicateHomework(hw.id)}
-                              className="p-1.5 text-slate-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/20 rounded-lg transition-colors"
+                              className="p-2 text-slate-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/20 rounded-lg transition-all"
                               title="Duplicate"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => deleteHomework(hw.id)}
-                              className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 rounded-lg transition-colors"
+                              className="p-2 text-slate-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 rounded-lg transition-all"
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-slate-400 font-medium">
-                        No homework found. Click "Assign Homework" to create one.
-                      </td>
-                    </tr>
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/20 flex items-center justify-center text-xl mb-3 animate-pulse">
+                        💡
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-300 font-outfit">No homework assigned for this day!</p>
+                      <p className="text-xs text-slate-400 mt-1">Get recommendations or create homework templates below.</p>
+                      
+                      {/* Suggestions list */}
+                      <div className="mt-6 w-full max-w-lg space-y-2">
+                        <p className="text-[10px] text-left uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />
+                          AI Suggestions
+                        </p>
+                        {HOMEWORK_SUGGESTIONS.map((sug, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                date: selectedScheduleDate,
+                                homeworkType: "School Homework",
+                                priority: sug.priority,
+                                estimatedTime: sug.estimatedTime,
+                                remarks: sug.remarks,
+                                attachmentName: "",
+                                attachmentUrl: ""
+                              });
+                              setHomeworkItems([{ id: Date.now(), subject: sug.subject, description: sug.description }]);
+                              setShowCreateModal(true);
+                            }}
+                            className="w-full text-left p-3.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/60 border border-slate-150 dark:border-slate-800 rounded-xl transition-all hover:scale-[1.01] flex items-center justify-between gap-4 group"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] font-black uppercase text-primary-500 bg-primary-50 dark:bg-primary-950/30 px-1.5 py-0.5 rounded">
+                                {sug.subject}
+                              </span>
+                              <h5 className="font-extrabold text-xs text-slate-800 dark:text-white mt-1 group-hover:text-primary-500 transition-colors font-outfit">{sug.title}</h5>
+                              <p className="text-[11px] text-slate-400 truncate mt-0.5">{sug.description}</p>
+                            </div>
+                            <span className="text-[10px] font-bold text-primary-500 shrink-0 group-hover:translate-x-1 transition-transform">
+                              Use →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Filtering Controls */}
+              <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search homework..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={subjectFilter}
+                    onChange={(e) => setSubjectFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
+                  >
+                    <option value="">All Subjects</option>
+                    {subjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                  </select>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
+                  >
+                    <option value="">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 font-semibold focus:outline-none"
+                  >
+                    <option value="">All Priorities</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Homework Table */}
+              <div className="glass-panel rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 text-[11px] uppercase tracking-wider font-bold border-b border-slate-100 dark:border-slate-800">
+                        <th className="px-5 py-3.5">Assign Date</th>
+                        <th className="px-5 py-3.5">Subject</th>
+                        <th className="px-5 py-3.5">Type</th>
+                        <th className="px-5 py-3.5">Homework Title</th>
+                        <th className="px-5 py-3.5">Priority</th>
+                        <th className="px-5 py-3.5">Student Completion</th>
+                        <th className="px-5 py-3.5">Progress</th>
+                        <th className="px-5 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300">
+                      {filteredHomeworkList.length > 0 ? (
+                        filteredHomeworkList.map((hw) => (
+                          <tr key={hw.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="px-5 py-4 font-semibold text-xs whitespace-nowrap">{hw.date}</td>
+                            <td className="px-5 py-4 font-bold font-outfit text-xs text-primary-600 dark:text-primary-400">{hw.subject}</td>
+                            <td className="px-5 py-4 text-xs whitespace-nowrap text-slate-500">{hw.homeworkType}</td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-800 dark:text-white font-outfit">{hw.title}</p>
+                              </div>
+                              <p className="text-xs text-slate-400 truncate max-w-[200px] mt-0.5">{hw.description}</p>
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                hw.priority === 'High' ? 'bg-danger-50 text-danger-600 dark:bg-danger-950/20 dark:text-danger-400' :
+                                hw.priority === 'Medium' ? 'bg-warning-50 text-warning-600 dark:bg-warning-950/20 dark:text-warning-400' :
+                                'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                              }`}>
+                                {hw.priority}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col gap-1 max-w-[160px]">
+                                {hw.students && hw.students.length > 0 ? (
+                                  hw.students.map((s, idx) => (
+                                    <div key={idx} className="flex items-center space-x-2 text-xs">
+                                      <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === 'Completed' ? 'bg-success-500 shadow-sm shadow-success-500/20' : 'bg-slate-350 dark:bg-slate-650'}`} />
+                                      <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">{s.student_name}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-slate-400 font-bold">General Assignment</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col gap-1.5 min-w-[100px]">
+                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full self-start ${
+                                  hw.completion_percentage === 100 
+                                    ? 'bg-success-50 text-success-600 dark:bg-success-950/20 dark:text-success-400' 
+                                    : 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
+                                }`}>
+                                  {hw.completion_percentage}% Done
+                                </span>
+                                <div className="w-20 bg-slate-150 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-300 ${hw.completion_percentage === 100 ? 'bg-success-500' : 'bg-amber-500'}`}
+                                    style={{ width: `${hw.completion_percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                <button 
+                                  onClick={() => startEdit(hw)}
+                                  className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => duplicateHomework(hw.id)}
+                                  className="p-1.5 text-slate-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/20 rounded-lg transition-colors"
+                                  title="Duplicate"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => deleteHomework(hw.id)}
+                                  className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="px-5 py-8 text-center text-slate-400 font-medium">
+                            No homework found. Click "Assign Homework" to create one.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Users, Calendar, HelpCircle, ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowLeft, Users, Calendar, HelpCircle, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Community: React.FC = () => {

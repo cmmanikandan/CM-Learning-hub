@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, FolderOpen, Download, Search, Tag, Eye, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, FolderOpen, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const LibraryInfo: React.FC = () => {

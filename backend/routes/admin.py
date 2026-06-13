@@ -53,7 +53,7 @@ def get_all_users():
             "class_name": u.class_name,
             "section": u.section,
             "parent_contact": u.parent_contact,
-            "streak": u.streak,
+            "streak": u.streak if u.role == 'student' else 0,
             "photo_url": u.photo_url,
             "created_at": u.id,  # approximate order
         }

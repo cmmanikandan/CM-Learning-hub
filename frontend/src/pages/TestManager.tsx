@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ModalPortal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import type { WrittenTest, WrittenTestSubmission } from '../context/AppContext';
@@ -15,8 +15,83 @@ import {
   FileText, 
   Calendar, 
   Clock, 
-  Award
+  Award,
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
+
+const LiveCountdown: React.FC<{ startTime?: string; endTime?: string; onUpdate?: () => void }> = ({ startTime, endTime, onUpdate }) => {
+  const [status, setStatus] = useState<'future' | 'active' | 'expired'>('active');
+  const [timeLeftString, setTimeLeftString] = useState('');
+
+  useEffect(() => {
+    if (!startTime && !endTime) {
+      setStatus('active');
+      setTimeLeftString('Open');
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const start = startTime ? new Date(startTime).getTime() : 0;
+      const end = endTime ? new Date(endTime).getTime() : Infinity;
+
+      if (startTime && now < start) {
+        setStatus('future');
+        const diff = start - now;
+        const hrs = Math.floor(diff / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        setTimeLeftString(`Starts in: ${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      } else if (endTime && now > end) {
+        setStatus('expired');
+        setTimeLeftString('Closed');
+        if (onUpdate) onUpdate();
+      } else {
+        setStatus('active');
+        if (endTime && end !== Infinity) {
+          const diff = end - now;
+          const hrs = Math.floor(diff / 3600000);
+          const mins = Math.floor((diff % 3600000) / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          setTimeLeftString(`Ends in: ${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+        } else {
+          setTimeLeftString('Open');
+        }
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [startTime, endTime]);
+
+  if (status === 'future') {
+    return (
+      <span className="flex items-center gap-1 bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold border border-amber-250/20">
+        <Clock className="w-3.5 h-3.5 animate-pulse text-amber-500" />
+        {timeLeftString}
+      </span>
+    );
+  }
+
+  if (status === 'expired') {
+    return (
+      <span className="flex items-center gap-1 bg-red-50 text-red-655 dark:bg-red-950/20 dark:text-red-400 text-[10px] px-2 py-0.5 rounded font-bold border border-red-250/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-red-550" />
+        {timeLeftString}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1 bg-success-50 text-success-655 dark:bg-success-950/20 dark:text-success-400 text-[10px] px-2 py-0.5 rounded font-bold border border-success-250/20">
+      <Clock className="w-3.5 h-3.5 text-success-500" />
+      {timeLeftString}
+    </span>
+  );
+};
+
 
 const CARD_THEMES = [
   {
@@ -65,6 +140,42 @@ const CARD_THEMES = [
 
 const getCardTheme = (index: number) => CARD_THEMES[index % CARD_THEMES.length];
 
+const TEST_SUGGESTIONS = [
+  {
+    testName: "Electromagnetism written exam",
+    subject: "Physics",
+    testType: "Chapter Test" as const,
+    description: "Written exam covering Faraday's Law, Lenz's Law, and electromagnetic induction. Detailed solutions must be drawn.",
+    instructions: "Use the standard A4 answer sheet. Show all steps and vector equations. Draw clean circuit diagrams.",
+    duration: 60,
+    totalMarks: 50,
+    questionPaperName: "physics_electromagnetism_test.pdf",
+    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
+  },
+  {
+    testName: "Organic Chemistry mechanisms test",
+    subject: "Chemistry",
+    testType: "Chapter Test" as const,
+    description: "Written paper on reaction mechanisms of alkenes, alkynes, and aromatic compounds.",
+    instructions: "Show arrow pushing mechanisms for all reactions. Draw clear chemical structures.",
+    duration: 90,
+    totalMarks: 75,
+    questionPaperName: "chemistry_organic_mechanisms_test.pdf",
+    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
+  },
+  {
+    testName: "Calculus Limits & Derivatives Exam",
+    subject: "Mathematics",
+    testType: "Unit Test" as const,
+    description: "Solve limits, derivatives using first principles, and chain rule applications.",
+    instructions: "Show all algebraic simplifications. No calculators allowed.",
+    duration: 45,
+    totalMarks: 40,
+    questionPaperName: "math_calculus_limits_test.pdf",
+    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
+  }
+];
+
 interface TestManagerProps {
   showCreateModal: boolean;
   setShowCreateModal: (show: boolean) => void;
@@ -88,8 +199,18 @@ export const TestManager: React.FC<TestManagerProps> = ({
     deleteWrittenTest, 
     writtenTestSubmissions, 
     submitWrittenTest, 
-    gradeWrittenSubmission 
+    gradeWrittenSubmission,
+    myStudents
   } = useApp();
+
+  // Tick state for live countdowns
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Teacher states
   const [evaluatingSub, setEvaluatingSub] = useState<WrittenTestSubmission | null>(null);
@@ -114,6 +235,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
   // Sheet Preview Transformations
   const [zoomScale, setZoomScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const rotatePreview = () => setRotation(r => (r + 90) % 360);
 
   // Mentor Tabs
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bank'>('dashboard');
@@ -122,6 +244,18 @@ export const TestManager: React.FC<TestManagerProps> = ({
   const [showAssignModal, setShowAssignModal] = useState<number | null>(null);
   const [assignStartDate, setAssignStartDate] = useState('');
   const [assignEndDate, setAssignEndDate] = useState('');
+  const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+
+  // Selected schedule date for calendar view
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  // Preset suggestions pre-fill state
+  const [presetPaperUrl, setPresetPaperUrl] = useState('');
+  const [presetPaperName, setPresetPaperName] = useState('');
 
   // Form states for test creation
   const [testName, setTestName] = useState('');
@@ -131,8 +265,16 @@ export const TestManager: React.FC<TestManagerProps> = ({
   const [instructions, setInstructions] = useState('');
   const [duration, setDuration] = useState(60);
   const [totalMarks, setTotalMarks] = useState(100);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date(Date.now() + 86400000 * 2);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  });
   const [questionPaperFile, setQuestionPaperFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -147,15 +289,92 @@ export const TestManager: React.FC<TestManagerProps> = ({
   // Question Paper Preview state
   const [previewPaperUrl, setPreviewPaperUrl] = useState<string | null>(null);
 
+  const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
+
+  const handleApplySuggestion = (sug: typeof TEST_SUGGESTIONS[0]) => {
+    setTestName(sug.testName);
+    setSubject(sug.subject);
+    setTestType(sug.testType);
+    setDescription(sug.description);
+    setInstructions(sug.instructions);
+    setDuration(sug.duration);
+    setTotalMarks(sug.totalMarks);
+    setPresetPaperUrl(sug.questionPaperUrl);
+    setPresetPaperName(sug.questionPaperName);
+    setStartDate(selectedScheduleDate);
+    setEndDate(selectedScheduleDate);
+    setIsBank(false);
+    setShowCreateModal(true);
+  };
+
+  const renderCalendar = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    const days: React.ReactNode[] = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="p-2 text-transparent">.</div>);
+    }
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isSelected = selectedScheduleDate === dateStr;
+      const hasTest = writtenTests.some(t => !t.is_bank && t.startDate && t.startDate.split('T')[0] === dateStr);
+      
+      days.push(
+        <button
+          key={d}
+          type="button"
+          onClick={() => setSelectedScheduleDate(dateStr)}
+          className={`p-2.5 border rounded-xl flex flex-col items-center justify-between transition-all relative ${
+            isSelected 
+              ? 'bg-primary-500 border-primary-500 text-white shadow-md shadow-primary-500/25' 
+              : 'border-slate-100 dark:border-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-slate-850 dark:text-slate-200'
+          }`}
+        >
+          <span className="text-xs font-black">{d}</span>
+          {hasTest && (
+            <span className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-primary-500'}`} />
+          )}
+        </button>
+      );
+    }
+    return days;
+  };
+
   // Submit test creator form
   const handleCreateTestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!testName || !questionPaperFile) return;
+    if (!testName) return;
+    if (!questionPaperFile && !presetPaperUrl) {
+      alert("Please upload a question paper or select a suggestion preset.");
+      return;
+    }
 
     try {
       setIsUploading(true);
-      setUploadProgress(0);
-      const questionPaperUrl = await uploadToCloudinary(questionPaperFile, setUploadProgress);
+      let paperUrl = presetPaperUrl;
+      let paperName = presetPaperName;
+
+      if (questionPaperFile) {
+        setUploadProgress(0);
+        paperUrl = await uploadToCloudinary(questionPaperFile, setUploadProgress);
+        paperName = questionPaperFile.name;
+      }
+
+      let studentIds: number[] | undefined = undefined;
+      if (!isBank) {
+        if (assignTarget === 'class') {
+          studentIds = (myStudents || [])
+            .filter(s => s.className && selectedClasses.includes(s.className))
+            .map(s => s.id);
+        } else if (assignTarget === 'students') {
+          studentIds = selectedStudentIds;
+        }
+      }
 
       await addWrittenTest({
         testName,
@@ -167,18 +386,24 @@ export const TestManager: React.FC<TestManagerProps> = ({
         totalMarks,
         startDate: !isBank ? new Date(startDate).toISOString() : undefined,
         endDate: !isBank ? new Date(endDate).toISOString() : undefined,
-        questionPaperUrl: questionPaperUrl,
-        questionPaperName: questionPaperFile.name,
-        is_bank: isBank
+        questionPaperUrl: paperUrl,
+        questionPaperName: paperName,
+        is_bank: isBank,
+        student_ids: studentIds
       });
 
       // Reset Form
       setTestName('');
       setQuestionPaperFile(null);
+      setPresetPaperUrl('');
+      setPresetPaperName('');
       setDescription('');
       setInstructions('');
       setIsBank(true);
       setShowCreateModal(false);
+      setAssignTarget('all');
+      setSelectedClasses([]);
+      setSelectedStudentIds([]);
     } catch (err: any) {
       console.error("Failed to schedule test:", err);
       alert(`Failed to schedule test: ${err.message || err}`);
@@ -189,12 +414,28 @@ export const TestManager: React.FC<TestManagerProps> = ({
   };
 
   const handleAssignSubmit = async (id: number) => {
-    if (!assignStartDate || !assignEndDate) return;
+    if (!assignStartDate || !assignEndDate) {
+      alert("Please select start and end date/times.");
+      return;
+    }
+
+    let studentIds: number[] | undefined = undefined;
+    if (assignTarget === 'class') {
+      studentIds = (myStudents || [])
+        .filter(s => s.className && selectedClasses.includes(s.className))
+        .map(s => s.id);
+    } else if (assignTarget === 'students') {
+      studentIds = selectedStudentIds;
+    }
+
     try {
-      await assignWrittenTest(id, new Date(assignStartDate).toISOString(), new Date(assignEndDate).toISOString());
+      await assignWrittenTest(id, new Date(assignStartDate).toISOString(), new Date(assignEndDate).toISOString(), studentIds);
       setShowAssignModal(null);
       setAssignStartDate('');
       setAssignEndDate('');
+      setAssignTarget('all');
+      setSelectedClasses([]);
+      setSelectedStudentIds([]);
     } catch (err: any) {
       console.error(err);
       alert(`Failed to assign test: ${err.message || err}`);
@@ -241,9 +482,47 @@ export const TestManager: React.FC<TestManagerProps> = ({
     setZoomScale(prev => Math.max(0.5, Math.min(2, prev + amount)));
   };
 
-  const rotatePreview = () => {
-    setRotation(prev => (prev + 90) % 360);
-  };
+  const groupedActiveTests = React.useMemo(() => {
+    // Filter active tests for the selected date
+    const dayTests = writtenTests.filter(t => 
+      !t.is_bank && t.startDate && t.startDate.split('T')[0] === selectedScheduleDate
+    );
+
+    // Group them by testName + questionPaperUrl
+    const groups: Record<string, {
+      testName: string;
+      subject: string;
+      testType: string;
+      duration: number;
+      totalMarks: number;
+      questionPaperUrl: string;
+      questionPaperName: string;
+      startDate: string;
+      endDate: string;
+      clones: WrittenTest[];
+    }> = {};
+
+    dayTests.forEach(test => {
+      const key = `${test.testName}_${test.questionPaperUrl}`;
+      if (!groups[key]) {
+        groups[key] = {
+          testName: test.testName,
+          subject: test.subject,
+          testType: test.testType,
+          duration: test.duration,
+          totalMarks: test.totalMarks,
+          questionPaperUrl: test.questionPaperUrl || '',
+          questionPaperName: test.questionPaperName || 'paper.pdf',
+          startDate: test.startDate || '',
+          endDate: test.endDate || '',
+          clones: []
+        };
+      }
+      groups[key].clones.push(test);
+    });
+
+    return Object.values(groups);
+  }, [writtenTests, selectedScheduleDate]);
 
   return (
     <div className="space-y-6">
@@ -270,8 +549,8 @@ export const TestManager: React.FC<TestManagerProps> = ({
               onClick={() => setActiveTab('dashboard')}
               className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
                 activeTab === 'dashboard' 
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-450 border-blue-200/50 dark:border-slate-700/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-500 shadow-md shadow-blue-500/20' 
+                  : 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 border-blue-200/50 dark:border-slate-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
               }`}
             >
               <Calendar className="w-4 h-4" />
@@ -281,8 +560,8 @@ export const TestManager: React.FC<TestManagerProps> = ({
               onClick={() => setActiveTab('bank')}
               className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
                 activeTab === 'bank' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-450 border-emerald-200/50 dark:border-slate-700/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md shadow-amber-500/20' 
+                  : 'bg-white dark:bg-slate-800 text-amber-655 dark:text-amber-450 border-amber-200/50 dark:border-slate-700 hover:bg-amber-50/50 dark:hover:bg-amber-950/10'
               }`}
             >
               <FileText className="w-4 h-4" />
@@ -291,86 +570,192 @@ export const TestManager: React.FC<TestManagerProps> = ({
           </div>
 
           {activeTab === 'dashboard' ? (
-            <>
-              {/* Active scheduled tests list */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {writtenTests.map((test, index) => {
-                  const theme = getCardTheme(index);
-                  return (
-                    <div key={test.id} className="premium-outline-card flex flex-col justify-between relative border border-slate-200 dark:border-slate-800">
-                      <div className={`h-1.5 w-full bg-gradient-to-r ${theme.gradient}`} />
-                      <div className="p-5 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className={`bg-gradient-to-r ${theme.gradient} text-white px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg tracking-wider`}>
-                              {test.testType}
-                            </span>
-                            
-                            <button
-                              onClick={() => deleteWrittenTest(test.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-danger-605 hover:bg-danger-50 dark:hover:bg-danger-950/20 transition-colors"
-                              title="Delete Test"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <h3 className="font-extrabold text-base text-slate-800 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">{test.testName}</h3>
-                        <p className="text-xs text-slate-400 mt-1 font-semibold">Subject: {test.subject} • Total Marks: {test.totalMarks} Marks</p>
-                        
-                        <div className="mt-4 p-2.5 bg-slate-50 dark:bg-slate-800/85 rounded-xl border border-slate-100 dark:border-slate-800/40 flex flex-col gap-2.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center space-x-1 text-slate-500 min-w-0">
-                              <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                              <span className="truncate text-slate-650 dark:text-slate-350" title={test.questionPaperName}>{test.questionPaperName}</span>
-                            </div>
-                            <button 
-                              onClick={() => setPreviewPaperUrl(test.questionPaperUrl)}
-                              className="text-[10px] font-bold text-primary-500 hover:underline shrink-0"
-                            >
-                              Preview Paper
-                            </button>
-                          </div>
-                          {test.questionPaperUrl && (
-                            <div className="flex items-center space-x-3 text-[10px]">
-                              <a 
-                                href={getCloudinaryDownloadUrl(test.questionPaperUrl)} 
-                                download 
-                                className="font-bold text-white bg-primary-600 hover:bg-primary-700 px-2.5 py-1 rounded-md flex items-center shadow-sm"
-                              >
-                                <Download className="w-3.5 h-3.5 mr-1" />
-                                Download
-                              </a>
-                              <a 
-                                href={test.questionPaperUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="font-bold text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 dark:text-slate-350 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 px-2.5 py-1 rounded-md flex items-center shadow-sm"
-                              >
-                                New Tab
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="px-5 pb-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-400 font-bold">
-                        <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1" />{test.duration} mins</span>
-                        <span>Due: {test.endDate ? new Date(test.endDate).toLocaleDateString() : 'N/A'}</span>
-                      </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Calendar Column */}
+                <div className="space-y-4">
+                  <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <Calendar className="w-4.5 h-4.5 text-primary-500" />
+                      <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                        Schedule Calendar
+                      </h3>
                     </div>
-                  );
-                })}
-                {writtenTests.length === 0 && (
-                  <div className="col-span-full py-12 text-center text-slate-400 font-medium">
-                    No active assignments scheduled. Assign one from the Test Bank or create a new test.
+                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
+                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {renderCalendar()}
+                    </div>
+                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-555 dark:text-slate-400 font-semibold space-y-1.5">
+                      <p className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                        Dots indicate dates with assigned tests.
+                      </p>
+                      <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+                    </div>
                   </div>
-                )}
+
+                  {/* Suggestions Panel */}
+                  <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <Sparkles className="w-4.5 h-4.5 text-primary-500 animate-pulse" />
+                      <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                        Preset Suggestions
+                      </h3>
+                    </div>
+                    <p className="text-[10px] text-slate-450 font-semibold mb-3 leading-tight">
+                      Quickly pre-fill and assign a preset test template for {selectedScheduleDate}:
+                    </p>
+                    <div className="space-y-2.5">
+                      {TEST_SUGGESTIONS.map((sug, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-xl flex items-center justify-between gap-3 hover:border-primary-200 transition-all">
+                          <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase text-primary-500 tracking-wider">{sug.subject}</span>
+                            <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">{sug.testName}</h4>
+                            <p className="text-[9px] text-slate-400 font-medium">{sug.testType} • {sug.duration}m • {sug.totalMarks} Marks</p>
+                          </div>
+                          <button
+                            onClick={() => handleApplySuggestion(sug)}
+                            className="px-2.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[10px] font-bold shadow-sm shrink-0 active:scale-95 transition-all"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Day's Assignments list */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm text-slate-455 uppercase tracking-wider font-outfit">Scheduled Tests for {selectedScheduleDate}</h3>
+                    <span className="text-xs font-bold text-primary-500 bg-primary-50 dark:bg-primary-950/20 px-2.5 py-0.5 rounded-full">{groupedActiveTests.length} Tests</span>
+                  </div>
+
+                  {groupedActiveTests.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {groupedActiveTests.map((grouped, index) => {
+                        const theme = getCardTheme(index);
+                        const totalAssigned = grouped.clones.length;
+                        const completedClones = grouped.clones.filter(clone => 
+                          writtenTestSubmissions.some(sub => sub.testId === clone.id)
+                        );
+                        const completedCount = completedClones.length;
+                        const completionPercentage = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0;
+                        
+                        return (
+                          <div key={grouped.testName} className="premium-outline-card flex flex-col justify-between border border-slate-200 dark:border-slate-800 relative">
+                            <div className={`h-1.5 w-full bg-gradient-to-r ${theme.gradient}`} />
+                            <div className="p-5 flex-1 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className={`bg-gradient-to-r ${theme.gradient} text-white px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg tracking-wider`}>
+                                    {grouped.testType}
+                                  </span>
+                                  
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => {
+                                        grouped.clones.forEach(clone => deleteWrittenTest(clone.id));
+                                      }}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-danger-650 hover:bg-danger-50 dark:hover:bg-danger-950/20 transition-colors"
+                                      title="Delete Test Group"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <h3 className="font-extrabold text-base text-slate-805 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">{grouped.testName}</h3>
+                                <p className="text-xs text-slate-450 mt-1 font-semibold">Subject: {grouped.subject} • {grouped.totalMarks} Marks</p>
+                                
+                                <div className="mt-4 p-2.5 bg-slate-50 dark:bg-slate-800/85 rounded-xl border border-slate-100 dark:border-slate-800/40 flex flex-col gap-2">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center space-x-1.5 text-slate-500 min-w-0">
+                                      <FileText className="w-4 h-4 text-slate-455 shrink-0" />
+                                      <span className="truncate text-slate-655 dark:text-slate-350">{grouped.questionPaperName}</span>
+                                    </div>
+                                    <button 
+                                      onClick={() => setPreviewPaperUrl(grouped.questionPaperUrl)}
+                                      className="text-[10px] font-bold text-primary-500 hover:underline shrink-0"
+                                    >
+                                      Preview Paper
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Scheduling timings */}
+                                {(grouped.startDate || grouped.endDate) && (
+                                  <div className="mt-3.5 p-2 bg-slate-100/60 dark:bg-slate-800/40 rounded-xl text-[9px] text-slate-555 font-bold space-y-0.5">
+                                    {grouped.startDate && (
+                                      <p>Starts: <span className="text-slate-700 dark:text-slate-300">{new Date(grouped.startDate).toLocaleString()}</span></p>
+                                    )}
+                                    {grouped.endDate && (
+                                      <p>Ends: <span className="text-slate-700 dark:text-slate-300">{new Date(grouped.endDate).toLocaleString()}</span></p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Progress bar */}
+                                <div className="mt-4">
+                                  <div className="flex justify-between items-center text-[10px] mb-1 font-bold text-slate-455 uppercase">
+                                    <span>Completion</span>
+                                    <span>{completedCount} / {totalAssigned} Students</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-200/10">
+                                    <div 
+                                      className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${theme.gradient}`}
+                                      style={{ width: `${completionPercentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Student completion details list */}
+                                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">Students Assigned:</p>
+                                  <div className="grid grid-cols-1 gap-1 max-h-24 overflow-y-auto pr-1">
+                                    {grouped.clones.map(clone => {
+                                      const isDone = writtenTestSubmissions.some(sub => sub.testId === clone.id);
+                                      const studentSub = writtenTestSubmissions.find(sub => sub.testId === clone.id);
+                                      return (
+                                        <div key={clone.id} className="flex items-center justify-between p-1 bg-slate-50/50 dark:bg-slate-850/50 rounded-lg text-[10px]">
+                                          <span className="font-extrabold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{clone.student_name}</span>
+                                          <span className={`font-bold px-1.5 py-0.5 rounded-full ${
+                                            isDone 
+                                              ? 'bg-success-50 text-success-700 dark:bg-success-950/20 dark:text-success-400' 
+                                              : 'bg-slate-100 text-slate-505 dark:bg-slate-800'
+                                          }`}>
+                                            {isDone ? `✓ ${studentSub?.marksObtained}/${clone.totalMarks}` : 'Pending'}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-16 flex flex-col items-center justify-center text-center glass-panel p-8 rounded-3xl bg-white dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3 shadow-inner">
+                        <Clock className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <h3 className="font-bold text-slate-700 dark:text-slate-350 font-outfit text-base">No Tests Scheduled</h3>
+                      <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no written tests assigned for {selectedScheduleDate}. Apply one of our preset suggestions on the left, or schedule from Test Bank!</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Answer sheet submissions list to grade */}
               <div className="glass-panel p-5 rounded-2xl">
-                <h3 className="font-bold text-base text-slate-800 dark:text-white mb-4 font-outfit">Student Test Submissions</h3>
+                <h3 className="font-bold text-base text-slate-805 dark:text-white mb-4 font-outfit">Student Test Submissions</h3>
                 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-sm">
@@ -426,7 +811,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <>
               {/* TEST BANK */}
@@ -494,36 +879,143 @@ export const TestManager: React.FC<TestManagerProps> = ({
 
           {/* Assign Written Test Modal */}
           {showAssignModal && (
-             <ModalPortal onClose={() => { setShowAssignModal(null); setAssignStartDate(''); setAssignEndDate(''); }}>
-              <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-full max-w-sm border border-slate-100 dark:border-slate-800 shadow-2xl">
-                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Assign Written Test</h3>
+             <ModalPortal onClose={() => {
+               setShowAssignModal(null);
+               setAssignStartDate('');
+               setAssignEndDate('');
+               setAssignTarget('all');
+               setSelectedClasses([]);
+               setSelectedStudentIds([]);
+             }}>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md border border-slate-100 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[85vh] animate-scaleIn">
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4 font-outfit">Assign Written Test & Schedule</h3>
                 
-                <div className="space-y-3 mb-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Start Date</label>
-                    <input 
-                      type="date" 
-                      value={assignStartDate}
-                      onChange={(e) => setAssignStartDate(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
-                      required
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Date & Time</label>
+                      <input 
+                        type="datetime-local" 
+                        value={assignStartDate}
+                        onChange={(e) => setAssignStartDate(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Date & Time</label>
+                      <input 
+                        type="datetime-local" 
+                        value={assignEndDate}
+                        onChange={(e) => setAssignEndDate(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">End Date (Due Date)</label>
-                    <input 
-                      type="date" 
-                      value={assignEndDate}
-                      onChange={(e) => setAssignEndDate(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
-                      required
-                    />
+
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800/40">
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 font-outfit tracking-wide">Target Students</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testAssignTarget" 
+                          value="all" 
+                          checked={assignTarget === 'all'} 
+                          onChange={() => setAssignTarget('all')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        All Assigned Students
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testAssignTarget" 
+                          value="class" 
+                          checked={assignTarget === 'class'} 
+                          onChange={() => setAssignTarget('class')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        By Standard/Class
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testAssignTarget" 
+                          value="students" 
+                          checked={assignTarget === 'students'} 
+                          onChange={() => setAssignTarget('students')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        Specific Students
+                      </label>
+                    </div>
+
+                    {assignTarget === 'class' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Classes</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {uniqueClasses.map(cls => (
+                            <label key={cls} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedClasses.includes(cls)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedClasses([...selectedClasses, cls]);
+                                  else setSelectedClasses(selectedClasses.filter(c => c !== cls));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              {cls}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {assignTarget === 'students' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Students</label>
+                        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                          {(myStudents || []).map(st => (
+                            <label key={st.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedStudentIds.includes(st.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, st.id]);
+                                  else setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              <div className="truncate">
+                                <p className="leading-tight truncate">{st.name}</p>
+                                {st.className && <p className="text-[9px] text-slate-400 leading-none mt-0.5">{st.className}</p>}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => { setShowAssignModal(null); setAssignStartDate(''); setAssignEndDate(''); }} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
-                  <button onClick={() => handleAssignSubmit(showAssignModal)} className="px-3 py-1.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg">Assign Now</button>
+                <div className="flex justify-end space-x-2 mt-6">
+                  <button 
+                    onClick={() => {
+                      setShowAssignModal(null);
+                      setAssignStartDate('');
+                      setAssignEndDate('');
+                      setAssignTarget('all');
+                      setSelectedClasses([]);
+                      setSelectedStudentIds([]);
+                    }} 
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-50 focus:outline-none"
+                  >
+                    Cancel
+                  </button>
+                  <button onClick={() => handleAssignSubmit(showAssignModal)} className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl active:scale-95 shadow-md transition-all">Assign Now</button>
                 </div>
               </div>
             </ModalPortal>
@@ -718,6 +1210,13 @@ export const TestManager: React.FC<TestManagerProps> = ({
                 const isGraded = submission?.status === 'Graded';
                 const percentage = isGraded && test.totalMarks > 0 ? Math.round((submission.marksObtained! / test.totalMarks) * 100) : 0;
                 
+                const startTimeMs = test.startDate ? new Date(test.startDate).getTime() : 0;
+                const endTimeMs = test.endDate ? new Date(test.endDate).getTime() : Infinity;
+
+                const isLocked = test.startDate ? currentTime < startTimeMs : false;
+                const isExpired = test.endDate ? currentTime > endTimeMs : false;
+                const isButtonDisabled = isSubmitted || isLocked || isExpired;
+
                 return (
                   <div 
                     key={test.id} 
@@ -736,13 +1235,17 @@ export const TestManager: React.FC<TestManagerProps> = ({
                             {test.testType}
                           </span>
                           
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
-                            isGraded ? 'bg-success-50 text-success-650 dark:bg-success-950/20 dark:text-success-400' : 
-                            (isSubmitted ? 'bg-primary-50 text-primary-650 dark:bg-primary-950/20 dark:text-primary-400' : 
-                            'bg-warning-50 text-warning-650 dark:bg-warning-950/20 dark:text-warning-400')
-                          }`}>
-                            {isGraded ? '✓ Evaluated' : (isSubmitted ? '• Submitted' : '✎ Assigned')}
-                          </span>
+                          {isGraded ? (
+                            <span className="bg-success-50 text-success-655 dark:bg-success-950/20 dark:text-success-400 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-success-200/20">
+                              ✓ Evaluated
+                            </span>
+                          ) : isSubmitted ? (
+                            <span className="bg-primary-50 text-primary-655 dark:bg-primary-950/20 dark:text-primary-400 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-primary-200/20">
+                              ✓ Submitted
+                            </span>
+                          ) : (
+                            <LiveCountdown startTime={test.startDate} endTime={test.endDate} />
+                          )}
                         </div>
 
                         <h3 className="font-extrabold text-base text-slate-800 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">{test.testName}</h3>
@@ -786,7 +1289,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                         <div className="flex flex-wrap items-center gap-3">
                           <button
                             onClick={() => setPreviewPaperUrl(test.questionPaperUrl)}
-                            className="flex items-center text-xs text-primary-650 hover:underline font-bold"
+                            className="flex items-center text-xs text-primary-655 hover:underline font-bold"
                           >
                             Preview
                           </button>
@@ -794,7 +1297,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                             <a
                               href={getCloudinaryDownloadUrl(test.questionPaperUrl)}
                               download
-                              className="flex items-center text-xs text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 font-semibold"
+                              className="flex items-center text-xs text-slate-400 hover:text-slate-650 dark:text-slate-405 dark:hover:text-slate-200 font-semibold"
                             >
                               <Download className="w-3.5 h-3.5 mr-1" /> Download
                             </a>
@@ -807,9 +1310,14 @@ export const TestManager: React.FC<TestManagerProps> = ({
                               setUploadingTestId(test.id);
                               setStudentAnswerFile(null);
                             }}
-                            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+                            disabled={isButtonDisabled}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl shadow-sm transition-all ${
+                              isButtonDisabled
+                                ? 'bg-slate-50 dark:bg-slate-805 text-slate-400 cursor-not-allowed border border-slate-200/10'
+                                : 'bg-primary-600 hover:bg-primary-700 text-white shadow-md active:scale-95'
+                            }`}
                           >
-                            Upload Answer
+                            {isLocked ? 'Locked' : isExpired ? 'Closed' : 'Upload Answer'}
                           </button>
                         )}
                       </div>
@@ -934,31 +1442,127 @@ export const TestManager: React.FC<TestManagerProps> = ({
                   <input type="number" value={totalMarks} onChange={(e) => setTotalMarks(Number(e.target.value))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white" min="10" required />
                 </div>
               </div>
-              {!isBank && (
-                <div className="grid grid-cols-2 gap-4 animate-fadeIn">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Date</label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" required />
+               {!isBank && (
+                <>
+                  <div className="grid grid-cols-2 gap-4 animate-fadeIn">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Date & Time</label>
+                      <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Date & Time</label>
+                      <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white" required />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Date</label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" required />
+
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800/40">
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 font-outfit tracking-wide">Target Students</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testCreateTarget" 
+                          value="all" 
+                          checked={assignTarget === 'all'} 
+                          onChange={() => setAssignTarget('all')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        All Assigned Students
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testCreateTarget" 
+                          value="class" 
+                          checked={assignTarget === 'class'} 
+                          onChange={() => setAssignTarget('class')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        By Standard/Class
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="testCreateTarget" 
+                          value="students" 
+                          checked={assignTarget === 'students'} 
+                          onChange={() => setAssignTarget('students')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        Specific Students
+                      </label>
+                    </div>
+
+                    {assignTarget === 'class' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Classes</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {uniqueClasses.map(cls => (
+                            <label key={cls} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedClasses.includes(cls)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedClasses([...selectedClasses, cls]);
+                                  else setSelectedClasses(selectedClasses.filter(c => c !== cls));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              {cls}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {assignTarget === 'students' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Students</label>
+                        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                          {(myStudents || []).map(st => (
+                            <label key={st.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedStudentIds.includes(st.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, st.id]);
+                                  else setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              <div className="truncate">
+                                <p className="leading-tight truncate">{st.name}</p>
+                                {st.className && <p className="text-[9px] text-slate-400 leading-none mt-0.5">{st.className}</p>}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                </>
               )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Question Paper File (PDF/Image)</label>
+                {presetPaperUrl && (
+                  <div className="mb-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-between text-xs text-slate-600">
+                    <span className="font-bold truncate max-w-[200px]">{presetPaperName}</span>
+                    <button type="button" onClick={() => { setPresetPaperUrl(''); setPresetPaperName(''); }} className="text-danger font-bold">Clear Preset</button>
+                  </div>
+                )}
                 <input 
                   type="file" 
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       setQuestionPaperFile(e.target.files[0]);
+                      setPresetPaperUrl('');
+                      setPresetPaperName('');
                     }
                   }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-slate-300"
                   accept=".pdf,image/*"
-                  required
+                  required={!presetPaperUrl}
                 />
               </div>
 
@@ -985,7 +1589,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                 </label>
                 <div className="flex space-x-2">
                   <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 focus:outline-none" disabled={isUploading}>Cancel</button>
-                  <button type="submit" className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 focus:outline-none flex items-center" disabled={isUploading || !questionPaperFile}>
+                  <button type="submit" className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 focus:outline-none flex items-center" disabled={isUploading || (!questionPaperFile && !presetPaperUrl)}>
                     {isUploading ? (isBank ? 'Saving...' : 'Scheduling...') : (isBank ? 'Save Test' : 'Schedule')}
                   </button>
                 </div>

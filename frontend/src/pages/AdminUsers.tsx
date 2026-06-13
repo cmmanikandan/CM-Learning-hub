@@ -3,9 +3,8 @@ import { ModalPortal } from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import {
   Search, Trash2, Edit2, UserX, Briefcase, GraduationCap,
-  RefreshCw, Plus, X, Eye, EyeOff, Shield, ChevronDown,
-  KeyRound, UserCheck, Users, AlertCircle, Check,
-  Mail, Phone, Building2, BookOpen, Hash
+  RefreshCw, Plus, X, Eye, EyeOff, Shield,
+  KeyRound, UserCheck, Users, AlertCircle, Check
 } from 'lucide-react';
 
 interface User {

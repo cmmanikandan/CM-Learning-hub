@@ -10,11 +10,33 @@ quiz_bp = Blueprint('quiz', __name__)
 @quiz_bp.route('', methods=['GET'])
 @jwt_required()
 def get_quizzes():
-    # Return assigned quizzes (is_bank=False)
-    quizzes = Quiz.query.filter_by(is_bank=False).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
+    identity = json.loads(get_jwt_identity())
+    from models import User
+    
+    if identity['role'] == 'student':
+        student = User.query.get(identity['id'])
+        m_id = student.mentor_id if student else None
+        
+        # Filter by student_id and their current mentor (or general ones)
+        q_filter = (Quiz.student_id == identity['id']) | (Quiz.student_id.is_(None))
+        if m_id:
+            q_filter = q_filter & ((Quiz.mentor_id == m_id) | (Quiz.mentor_id.is_(None)))
+        else:
+            q_filter = q_filter & (Quiz.mentor_id.is_(None))
+            
+        quizzes = Quiz.query.filter_by(is_bank=False).filter(q_filter).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
+    elif identity['role'] == 'mentor':
+        students = User.query.filter_by(mentor_id=identity['id']).all()
+        student_ids = [s.id for s in students]
+        quizzes = Quiz.query.filter_by(is_bank=False).filter(
+            (Quiz.student_id.in_(student_ids)) | (Quiz.student_id.is_(None))
+        ).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
+    else:
+        quizzes = Quiz.query.filter_by(is_bank=False).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
     
     result = []
     for q in quizzes:
+        s_user = User.query.get(q.student_id) if q.student_id else None
         result.append({
             "id": q.id,
             "quiz_name": q.quiz_name,
@@ -28,7 +50,9 @@ def get_quizzes():
             "start_time": q.start_time.isoformat() if q.start_time else None,
             "end_time": q.end_time.isoformat() if q.end_time else None,
             "assignment_date": q.assignment_date.isoformat() if q.assignment_date else None,
-            "questions_count": len(q.questions)
+            "questions_count": len(q.questions),
+            "student_id": q.student_id,
+            "student_name": s_user.name if s_user else "All Students"
         })
     return jsonify(result), 200
 
@@ -113,55 +137,160 @@ def create_quiz():
         
     total_marks = sum(int(q.get('marks', 1)) for q in questions_data)
     
-    new_quiz = Quiz(
-        quiz_name=quiz_name,
-        subject=subject,
-        chapter=data.get('chapter'),
-        lesson=data.get('lesson'),
-        difficulty=data.get('difficulty', 'Medium'),
-        instructions=data.get('instructions'),
-        time_limit=int(data.get('time_limit', 15)),
-        passing_marks=int(data.get('passing_marks', 50)),
-        total_marks=total_marks,
-        is_bank=is_bank
-    )
+    # Scheduled time handling
+    start_time_obj = None
+    end_time_obj = None
+    assignment_date_obj = None
     
-    # If assigned immediately
-    if not is_bank and data.get('assignment_date'):
-        new_quiz.assignment_date = datetime.strptime(data['assignment_date'], '%Y-%m-%d').date()
-    
-    db.session.add(new_quiz)
-    db.session.commit()
-    
-    for q_data in questions_data:
-        q_item = Question(
-            quiz_id=new_quiz.id,
-            question_type=q_data.get('question_type', 'mcq'),
-            question_text=q_data.get('question_text'),
-            options=q_data.get('options'),
-            correct_answer=str(q_data.get('correct_answer')),
-            explanation=q_data.get('explanation'),
-            marks=int(q_data.get('marks', 1))
-        )
-        db.session.add(q_item)
-        
-    db.session.commit()
-    
-    # Notify student if it's an active quiz assignment
-    if not is_bank:
-        from models import User
-        student = User.query.filter_by(role='student').first()
-        if student:
-            notif = Notification(
-                user_id=student.id,
-                title="New Quiz Scheduled",
-                content=f"New quiz available: {new_quiz.quiz_name} for {new_quiz.subject}",
-                notification_type="quiz"
-            )
-            db.session.add(notif)
-            db.session.commit()
+    if data.get('start_time'):
+        try:
+            start_time_obj = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+            assignment_date_obj = start_time_obj.date()
+        except Exception as e:
+            print("Failed to parse start_time:", e)
             
-    return jsonify({"message": "Quiz created successfully", "id": new_quiz.id}), 201
+    if data.get('end_time'):
+        try:
+            end_time_obj = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+        except Exception as e:
+            print("Failed to parse end_time:", e)
+            
+    if not assignment_date_obj:
+        if data.get('assignment_date'):
+            assignment_date_obj = datetime.strptime(data['assignment_date'], '%Y-%m-%d').date()
+        else:
+            assignment_date_obj = datetime.utcnow().date()
+            
+    # Target students
+    from models import User
+    student_ids = data.get('student_ids')
+    
+    if is_bank:
+        # Bank templates are global/not student specific
+        new_quiz = Quiz(
+            quiz_name=quiz_name,
+            subject=subject,
+            chapter=data.get('chapter'),
+            lesson=data.get('lesson'),
+            difficulty=data.get('difficulty', 'Medium'),
+            instructions=data.get('instructions'),
+            time_limit=int(data.get('time_limit', 15)),
+            passing_marks=int(data.get('passing_marks', 50)),
+            total_marks=total_marks,
+            is_bank=True,
+            student_id=None
+        )
+        db.session.add(new_quiz)
+        db.session.commit()
+        
+        for q_data in questions_data:
+            q_item = Question(
+                quiz_id=new_quiz.id,
+                question_type=q_data.get('question_type', 'mcq'),
+                question_text=q_data.get('question_text'),
+                options=q_data.get('options'),
+                correct_answer=str(q_data.get('correct_answer')),
+                explanation=q_data.get('explanation'),
+                marks=int(q_data.get('marks', 1))
+            )
+            db.session.add(q_item)
+        db.session.commit()
+        return jsonify({"message": "Quiz template created in bank", "id": new_quiz.id}), 201
+
+    # For active assignment, duplicate per target student
+    if student_ids:
+        students = User.query.filter(
+            User.id.in_(student_ids),
+            User.mentor_id == identity['id'],
+            User.role == 'student'
+        ).all()
+    else:
+        students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
+        
+    if not students:
+        # Fallback to general/unassigned assignment
+        new_quiz = Quiz(
+            quiz_name=quiz_name,
+            subject=subject,
+            chapter=data.get('chapter'),
+            lesson=data.get('lesson'),
+            difficulty=data.get('difficulty', 'Medium'),
+            instructions=data.get('instructions'),
+            time_limit=int(data.get('time_limit', 15)),
+            passing_marks=int(data.get('passing_marks', 50)),
+            total_marks=total_marks,
+            is_bank=False,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            assignment_date=assignment_date_obj,
+            student_id=None,
+            mentor_id=identity['id']
+        )
+        db.session.add(new_quiz)
+        db.session.commit()
+        
+        for q_data in questions_data:
+            q_item = Question(
+                quiz_id=new_quiz.id,
+                question_type=q_data.get('question_type', 'mcq'),
+                question_text=q_data.get('question_text'),
+                options=q_data.get('options'),
+                correct_answer=str(q_data.get('correct_answer')),
+                explanation=q_data.get('explanation'),
+                marks=int(q_data.get('marks', 1))
+            )
+            db.session.add(q_item)
+        db.session.commit()
+        return jsonify({"message": "Quiz assigned successfully", "id": new_quiz.id}), 201
+        
+    first_quiz_id = None
+    for student in students:
+        new_quiz = Quiz(
+            quiz_name=quiz_name,
+            subject=subject,
+            chapter=data.get('chapter'),
+            lesson=data.get('lesson'),
+            difficulty=data.get('difficulty', 'Medium'),
+            instructions=data.get('instructions'),
+            time_limit=int(data.get('time_limit', 15)),
+            passing_marks=int(data.get('passing_marks', 50)),
+            total_marks=total_marks,
+            is_bank=False,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            assignment_date=assignment_date_obj,
+            student_id=student.id,
+            mentor_id=identity['id']
+        )
+        db.session.add(new_quiz)
+        db.session.commit()
+        if not first_quiz_id:
+            first_quiz_id = new_quiz.id
+            
+        for q_data in questions_data:
+            q_item = Question(
+                quiz_id=new_quiz.id,
+                question_type=q_data.get('question_type', 'mcq'),
+                question_text=q_data.get('question_text'),
+                options=q_data.get('options'),
+                correct_answer=str(q_data.get('correct_answer')),
+                explanation=q_data.get('explanation'),
+                marks=int(q_data.get('marks', 1))
+            )
+            db.session.add(q_item)
+        db.session.commit()
+        
+        # Notify student
+        notif = Notification(
+            user_id=student.id,
+            title="New Quiz Scheduled",
+            content=f"New quiz '{new_quiz.quiz_name}' scheduled to start at {new_quiz.start_time.strftime('%Y-%m-%d %H:%M') if new_quiz.start_time else 'anytime'}.",
+            notification_type="quiz"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        
+    return jsonify({"message": "Quiz created and assigned successfully", "id": first_quiz_id}), 201
 
 @quiz_bp.route('/assign', methods=['POST'])
 @jwt_required()
@@ -172,61 +301,135 @@ def assign_quiz():
         
     data = request.get_json() or {}
     bank_quiz_id = data.get('quiz_id')
-    assignment_date = data.get('assignment_date')
     
-    if not bank_quiz_id or not assignment_date:
-        return jsonify({"message": "Missing quiz_id or assignment_date"}), 400
+    if not bank_quiz_id:
+        return jsonify({"message": "Missing quiz_id"}), 400
         
     bank_quiz = Quiz.query.filter_by(id=bank_quiz_id, is_bank=True).first()
     if not bank_quiz:
         return jsonify({"message": "Bank Quiz not found"}), 404
         
-    # Duplicate the quiz for assignment
-    assigned_quiz = Quiz(
-        quiz_name=bank_quiz.quiz_name,
-        subject=bank_quiz.subject,
-        chapter=bank_quiz.chapter,
-        lesson=bank_quiz.lesson,
-        difficulty=bank_quiz.difficulty,
-        instructions=bank_quiz.instructions,
-        time_limit=bank_quiz.time_limit,
-        passing_marks=bank_quiz.passing_marks,
-        total_marks=bank_quiz.total_marks,
-        is_bank=False,
-        assignment_date=datetime.strptime(assignment_date, '%Y-%m-%d').date()
-    )
+    # Scheduled time handling
+    start_time_obj = None
+    end_time_obj = None
+    assignment_date_obj = None
     
-    db.session.add(assigned_quiz)
-    db.session.commit()
-    
-    for b_q in bank_quiz.questions:
-        assigned_q = Question(
-            quiz_id=assigned_quiz.id,
-            question_type=b_q.question_type,
-            question_text=b_q.question_text,
-            options=b_q.options,
-            correct_answer=b_q.correct_answer,
-            explanation=b_q.explanation,
-            marks=b_q.marks
-        )
-        db.session.add(assigned_q)
-        
-    db.session.commit()
-    
-    # Notify student
+    if data.get('start_time'):
+        try:
+            start_time_obj = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+            assignment_date_obj = start_time_obj.date()
+        except Exception as e:
+            print("Failed to parse start_time:", e)
+            
+    if data.get('end_time'):
+        try:
+            end_time_obj = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+        except Exception as e:
+            print("Failed to parse end_time:", e)
+            
+    if not assignment_date_obj:
+        if data.get('assignment_date'):
+            assignment_date_obj = datetime.strptime(data['assignment_date'], '%Y-%m-%d').date()
+        else:
+            assignment_date_obj = datetime.utcnow().date()
+            
+    # Target students
     from models import User
-    student = User.query.filter_by(role='student').first()
-    if student:
+    student_ids = data.get('student_ids')
+    
+    if student_ids:
+        students = User.query.filter(
+            User.id.in_(student_ids),
+            User.mentor_id == identity['id'],
+            User.role == 'student'
+        ).all()
+    else:
+        students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
+        
+    if not students:
+        # Fallback to general assignment
+        assigned_quiz = Quiz(
+            quiz_name=bank_quiz.quiz_name,
+            subject=bank_quiz.subject,
+            chapter=bank_quiz.chapter,
+            lesson=bank_quiz.lesson,
+            difficulty=bank_quiz.difficulty,
+            instructions=bank_quiz.instructions,
+            time_limit=bank_quiz.time_limit,
+            passing_marks=bank_quiz.passing_marks,
+            total_marks=bank_quiz.total_marks,
+            is_bank=False,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            assignment_date=assignment_date_obj,
+            student_id=None,
+            mentor_id=identity['id']
+        )
+        db.session.add(assigned_quiz)
+        db.session.commit()
+        
+        for b_q in bank_quiz.questions:
+            assigned_q = Question(
+                quiz_id=assigned_quiz.id,
+                question_type=b_q.question_type,
+                question_text=b_q.question_text,
+                options=b_q.options,
+                correct_answer=b_q.correct_answer,
+                explanation=b_q.explanation,
+                marks=b_q.marks
+            )
+            db.session.add(assigned_q)
+        db.session.commit()
+        return jsonify({"message": "Quiz assigned successfully", "id": assigned_quiz.id}), 201
+        
+    first_quiz_id = None
+    for student in students:
+        assigned_quiz = Quiz(
+            quiz_name=bank_quiz.quiz_name,
+            subject=bank_quiz.subject,
+            chapter=bank_quiz.chapter,
+            lesson=bank_quiz.lesson,
+            difficulty=bank_quiz.difficulty,
+            instructions=bank_quiz.instructions,
+            time_limit=bank_quiz.time_limit,
+            passing_marks=bank_quiz.passing_marks,
+            total_marks=bank_quiz.total_marks,
+            is_bank=False,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            assignment_date=assignment_date_obj,
+            student_id=student.id,
+            mentor_id=identity['id']
+        )
+        db.session.add(assigned_quiz)
+        db.session.commit()
+        if not first_quiz_id:
+            first_quiz_id = assigned_quiz.id
+            
+        for b_q in bank_quiz.questions:
+            assigned_q = Question(
+                quiz_id=assigned_quiz.id,
+                question_type=b_q.question_type,
+                question_text=b_q.question_text,
+                options=b_q.options,
+                correct_answer=b_q.correct_answer,
+                explanation=b_q.explanation,
+                marks=b_q.marks
+            )
+            db.session.add(assigned_q)
+        db.session.commit()
+        
+        # Notify student
         notif = Notification(
             user_id=student.id,
             title="New Quiz Assigned",
-            content=f"Quiz '{assigned_quiz.quiz_name}' has been assigned for {assignment_date}",
+            content=f"Quiz '{assigned_quiz.quiz_name}' has been assigned to start at {assigned_quiz.start_time.strftime('%Y-%m-%d %H:%M') if assigned_quiz.start_time else 'anytime'}.",
             notification_type="quiz"
         )
         db.session.add(notif)
         db.session.commit()
         
-    return jsonify({"message": "Quiz assigned successfully", "id": assigned_quiz.id}), 201
+    return jsonify({"message": "Quiz assigned successfully", "id": first_quiz_id}), 201
 
 @quiz_bp.route('/<int:quiz_id>/submit', methods=['POST'])
 @jwt_required()

@@ -14,7 +14,12 @@ def recalculate_student_streak(student_id):
     if not student:
         return 0
         
-    completed_hws = Homework.query.filter_by(student_id=student_id, status='Completed').all()
+    m_id = student.mentor_id
+    if m_id:
+        completed_hws = Homework.query.filter_by(student_id=student_id, mentor_id=m_id, status='Completed').all()
+    else:
+        completed_hws = Homework.query.filter_by(student_id=student_id, status='Completed').filter(Homework.mentor_id.is_(None)).all()
+
     if not completed_hws:
         student.streak = 0
         db.session.commit()
@@ -69,7 +74,8 @@ def carry_forward_pending_homework():
                 remarks=hw.remarks,
                 status='Pending',
                 carried_from_id=hw.id,
-                student_id=hw.student_id
+                student_id=hw.student_id,
+                mentor_id=hw.mentor_id
             )
             db.session.add(clone)
             cloned_any = True
@@ -156,8 +162,17 @@ def get_all_homework():
     from models import User
     
     if identity['role'] == 'student':
+        student = User.query.get(identity['id'])
+        m_id = student.mentor_id if student else None
+        
         # Students only see homework assigned to them or unassigned general homework
+        # Filter by student_id and their current mentor (or general ones)
         query = query.filter((Homework.student_id == identity['id']) | (Homework.student_id.is_(None)))
+        if m_id:
+            query = query.filter((Homework.mentor_id == m_id) | (Homework.mentor_id.is_(None)))
+        else:
+            query = query.filter(Homework.mentor_id.is_(None))
+            
         if subject:
             query = query.filter(Homework.subject.ilike(f"%{subject}%"))
         if status:
@@ -316,7 +331,8 @@ def create_homework():
             attachment_url=data.get('attachment_url'),
             remarks=data.get('remarks'),
             status='Pending',
-            student_id=None
+            student_id=None,
+            mentor_id=identity['id']
         )
         db.session.add(new_hw)
         db.session.commit()
@@ -336,7 +352,8 @@ def create_homework():
             attachment_url=data.get('attachment_url'),
             remarks=data.get('remarks'),
             status='Pending',
-            student_id=student.id
+            student_id=student.id,
+            mentor_id=identity['id']
         )
         db.session.add(new_hw)
         db.session.commit()

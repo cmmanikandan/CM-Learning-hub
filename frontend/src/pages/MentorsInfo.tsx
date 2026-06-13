@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Users, BarChart3, ShieldCheck, Mail, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Users, BarChart3, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const MentorsInfo: React.FC = () => {

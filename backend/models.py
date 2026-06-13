@@ -54,6 +54,7 @@ class Homework(db.Model):
     status = db.Column(db.String(20), nullable=False, default='Pending') # 'Pending' or 'Completed'
     carried_from_id = db.Column(db.Integer, db.ForeignKey('homework.id', ondelete='SET NULL'), nullable=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class LibraryMaterial(db.Model):
@@ -69,9 +70,10 @@ class LibraryMaterial(db.Model):
     thumbnail_url = db.Column(db.String(256), nullable=True)
     visibility = db.Column(db.String(20), nullable=False, default='Public') # 'Public' or 'Private'
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    uploaded_by = db.relationship('User', foreign_keys=[uploaded_by_id], lazy=True)
+    uploaded_by = db.relationship('User', foreign_keys='LibraryMaterial.uploaded_by_id', lazy=True)
 
 class Quiz(db.Model):
     __tablename__ = 'quizzes'
@@ -90,6 +92,8 @@ class Quiz(db.Model):
     end_time = db.Column(db.DateTime, nullable=True)
     is_bank = db.Column(db.Boolean, nullable=False, default=False)
     assignment_date = db.Column(db.Date, nullable=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     questions = db.relationship('Question', backref='quiz', lazy=True, cascade="all, delete-orphan")
@@ -138,6 +142,8 @@ class WrittenTest(db.Model):
     question_paper_name = db.Column(db.String(256), nullable=True)
     is_bank = db.Column(db.Boolean, nullable=False, default=False)
     assignment_date = db.Column(db.Date, nullable=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     submissions = db.relationship('WrittenTestSubmission', backref='test', lazy=True, cascade="all, delete-orphan")

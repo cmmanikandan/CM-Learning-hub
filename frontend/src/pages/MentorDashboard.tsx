@@ -4,7 +4,6 @@ import type { Quiz, WrittenTest } from '../context/AppContext';
 import {
   BookOpen,
   Calendar as CalendarIcon,
-  Clock,
   FileText,
   Flame,
   GraduationCap,
@@ -14,7 +13,6 @@ import {
   AlertTriangle,
   BarChart3,
   Zap,
-  Users,
   Award,
 } from 'lucide-react';
 import {
@@ -44,7 +42,6 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
     quizSubmissions,
     writtenTests,
     writtenTestSubmissions,
-    streakDays,
     updateMentorNotes
   } = useApp();
 
@@ -142,7 +139,7 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
     },
     {
       label: 'Quiz Accuracy',
-      value: avgQuizAcc ? `${avgQuizAcc}%` : 'N/A',
+      value: studentQuizSubs.length > 0 ? `${avgQuizAcc}%` : '0%',
       sub: `${studentQuizSubs.length} submissions`,
       icon: Zap,
       gradient: 'from-emerald-500 to-teal-600',
@@ -154,7 +151,7 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
     },
     {
       label: 'Test Score Avg',
-      value: avgTestScore ? `${avgTestScore}%` : 'N/A',
+      value: gradedTests.length > 0 ? `${avgTestScore}%` : '0%',
       sub: `${gradedTests.length} graded`,
       icon: FileText,
       gradient: 'from-amber-500 to-orange-600',
@@ -166,14 +163,14 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
     },
     {
       label: 'Study Streak',
-      value: `${streakDays}d`,
+      value: `${studentProfile?.streak || 0}d`,
       sub: 'Consecutive days',
       icon: Flame,
       gradient: 'from-pink-500 to-rose-600',
       shadow: 'shadow-pink-500/25',
       iconBg: 'bg-pink-400/20',
       ring: 'ring-pink-400/30',
-      badge: streakDays >= 7 ? '🔥 On fire!' : 'Keep going',
+      badge: (studentProfile?.streak || 0) >= 7 ? '🔥 On fire!' : 'Keep going',
       badgeColor: 'bg-pink-400/20 text-pink-200',
     },
   ];
@@ -248,8 +245,8 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
             <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15">
               <Flame className="w-5 h-5 text-amber-300 fill-amber-300 animate-pulse" />
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/70 font-semibold">Streak</p>
-                <p className="text-sm font-extrabold font-outfit">{streakDays} Days 🔥</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/70 font-semibold">Student Streak</p>
+                <p className="text-sm font-extrabold font-outfit">{studentProfile?.streak || 0} Days 🔥</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15">

@@ -9,10 +9,33 @@ tests_bp = Blueprint('tests', __name__)
 @tests_bp.route('', methods=['GET'])
 @jwt_required()
 def get_written_tests():
-    tests = WrittenTest.query.filter_by(is_bank=False).order_by(WrittenTest.created_at.desc()).all()
+    identity = json.loads(get_jwt_identity())
+    from models import User
+    
+    if identity['role'] == 'student':
+        student = User.query.get(identity['id'])
+        m_id = student.mentor_id if student else None
+        
+        # Filter by student_id and their current mentor (or general ones)
+        t_filter = (WrittenTest.student_id == identity['id']) | (WrittenTest.student_id.is_(None))
+        if m_id:
+            t_filter = t_filter & ((WrittenTest.mentor_id == m_id) | (WrittenTest.mentor_id.is_(None)))
+        else:
+            t_filter = t_filter & (WrittenTest.mentor_id.is_(None))
+            
+        tests = WrittenTest.query.filter_by(is_bank=False).filter(t_filter).order_by(WrittenTest.created_at.desc()).all()
+    elif identity['role'] == 'mentor':
+        students = User.query.filter_by(mentor_id=identity['id']).all()
+        student_ids = [s.id for s in students]
+        tests = WrittenTest.query.filter_by(is_bank=False).filter(
+            (WrittenTest.student_id.in_(student_ids)) | (WrittenTest.student_id.is_(None))
+        ).order_by(WrittenTest.created_at.desc()).all()
+    else:
+        tests = WrittenTest.query.filter_by(is_bank=False).order_by(WrittenTest.created_at.desc()).all()
     
     result = []
     for t in tests:
+        s_user = User.query.get(t.student_id) if t.student_id else None
         result.append({
             "id": t.id,
             "test_name": t.test_name,
@@ -26,7 +49,9 @@ def get_written_tests():
             "end_date": t.end_date.isoformat() if t.end_date else None,
             "question_paper_url": t.question_paper_url,
             "question_paper_name": t.question_paper_name,
-            "created_at": t.created_at.isoformat()
+            "created_at": t.created_at.isoformat(),
+            "student_id": t.student_id,
+            "student_name": s_user.name if s_user else "All Students"
         })
         
     return jsonify(result), 200
@@ -71,43 +96,114 @@ def create_test():
     if not test_name or not subject or not question_paper_url:
         return jsonify({"message": "Missing required test parameters"}), 400
         
-    start_date = datetime.fromisoformat(data.get('start_date')) if data.get('start_date') else None
-    end_date = datetime.fromisoformat(data.get('end_date')) if data.get('end_date') else None
+    start_date = None
+    end_date = None
+    assignment_date_obj = None
+    
+    if data.get('start_date'):
+        start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
+        assignment_date_obj = start_date.date()
+        
+    if data.get('end_date'):
+        end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+        
+    if not assignment_date_obj:
+        if data.get('assignment_date'):
+            assignment_date_obj = datetime.strptime(data['assignment_date'], '%Y-%m-%d').date()
+        else:
+            assignment_date_obj = datetime.utcnow().date()
+            
     is_bank = data.get('is_bank', False)
     
-    new_test = WrittenTest(
-        test_name=test_name,
-        subject=subject,
-        test_type=data.get('test_type', 'Unit Test'),
-        description=data.get('description'),
-        instructions=data.get('instructions'),
-        duration=int(data.get('duration', 60)),
-        total_marks=int(data.get('total_marks', 100)),
-        start_date=start_date,
-        end_date=end_date,
-        question_paper_url=question_paper_url,
-        question_paper_name=data.get('question_paper_name', 'paper.pdf'),
-        is_bank=is_bank
-    )
+    if is_bank:
+        new_test = WrittenTest(
+            test_name=test_name,
+            subject=subject,
+            test_type=data.get('test_type', 'Unit Test'),
+            description=data.get('description'),
+            instructions=data.get('instructions'),
+            duration=int(data.get('duration', 60)),
+            total_marks=int(data.get('total_marks', 100)),
+            question_paper_url=question_paper_url,
+            question_paper_name=data.get('question_paper_name', 'paper.pdf'),
+            is_bank=True,
+            student_id=None
+        )
+        db.session.add(new_test)
+        db.session.commit()
+        return jsonify({"message": "Written test template created in bank", "id": new_test.id}), 201
+
+    # Target students
+    from models import User
+    student_ids = data.get('student_ids')
     
-    db.session.add(new_test)
-    db.session.commit()
-    
-    # Notify student
-    if not is_bank:
-        from models import User
-        student = User.query.filter_by(role='student').first()
-        if student:
-            notif = Notification(
-                user_id=student.id,
-                title="Written Test Scheduled",
-                content=f"A new written test '{new_test.test_name}' has been scheduled for {new_test.subject}",
-                notification_type="test"
-            )
-            db.session.add(notif)
-            db.session.commit()
+    if student_ids:
+        students = User.query.filter(
+            User.id.in_(student_ids),
+            User.mentor_id == identity['id'],
+            User.role == 'student'
+        ).all()
+    else:
+        students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
         
-    return jsonify({"message": "Written test created successfully", "id": new_test.id}), 201
+    if not students:
+        # Fallback to general assignment
+        new_test = WrittenTest(
+            test_name=test_name,
+            subject=subject,
+            test_type=data.get('test_type', 'Unit Test'),
+            description=data.get('description'),
+            instructions=data.get('instructions'),
+            duration=int(data.get('duration', 60)),
+            total_marks=int(data.get('total_marks', 100)),
+            start_date=start_date,
+            end_date=end_date,
+            assignment_date=assignment_date_obj,
+            question_paper_url=question_paper_url,
+            question_paper_name=data.get('question_paper_name', 'paper.pdf'),
+            is_bank=False,
+            student_id=None,
+            mentor_id=identity['id']
+        )
+        db.session.add(new_test)
+        db.session.commit()
+        return jsonify({"message": "Written test created successfully", "id": new_test.id}), 201
+        
+    first_test_id = None
+    for student in students:
+        new_test = WrittenTest(
+            test_name=test_name,
+            subject=subject,
+            test_type=data.get('test_type', 'Unit Test'),
+            description=data.get('description'),
+            instructions=data.get('instructions'),
+            duration=int(data.get('duration', 60)),
+            total_marks=int(data.get('total_marks', 100)),
+            start_date=start_date,
+            end_date=end_date,
+            assignment_date=assignment_date_obj,
+            question_paper_url=question_paper_url,
+            question_paper_name=data.get('question_paper_name', 'paper.pdf'),
+            is_bank=False,
+            student_id=student.id,
+            mentor_id=identity['id']
+        )
+        db.session.add(new_test)
+        db.session.commit()
+        if not first_test_id:
+            first_test_id = new_test.id
+            
+        # Notify student
+        notif = Notification(
+            user_id=student.id,
+            title="Written Test Scheduled",
+            content=f"A new written test '{new_test.test_name}' has been scheduled to start at {new_test.start_date.strftime('%Y-%m-%d %H:%M') if new_test.start_date else 'anytime'}.",
+            notification_type="test"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        
+    return jsonify({"message": "Written test created and assigned successfully", "id": first_test_id}), 201
 
 @tests_bp.route('/<int:test_id>/submit', methods=['POST'])
 @jwt_required()
@@ -245,39 +341,81 @@ def assign_written_test():
     if not bank_test:
         return jsonify({"message": "Bank test not found"}), 404
         
-    # Duplicate test for assignment
-    assigned_test = WrittenTest(
-        test_name=bank_test.test_name,
-        subject=bank_test.subject,
-        test_type=bank_test.test_type,
-        description=bank_test.description,
-        instructions=bank_test.instructions,
-        duration=bank_test.duration,
-        total_marks=bank_test.total_marks,
-        start_date=datetime.fromisoformat(start_date_str),
-        end_date=datetime.fromisoformat(end_date_str),
-        question_paper_url=bank_test.question_paper_url,
-        question_paper_name=bank_test.question_paper_name,
-        is_bank=False
-    )
+    start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+    end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+    assignment_date_obj = start_date.date()
     
-    db.session.add(assigned_test)
-    db.session.commit()
-    
-    # Notify student
+    # Target students
     from models import User
-    student = User.query.filter_by(role='student').first()
-    if student:
+    student_ids = data.get('student_ids')
+    
+    if student_ids:
+        students = User.query.filter(
+            User.id.in_(student_ids),
+            User.mentor_id == identity['id'],
+            User.role == 'student'
+        ).all()
+    else:
+        students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
+        
+    if not students:
+        # Fallback to general assignment
+        assigned_test = WrittenTest(
+            test_name=bank_test.test_name,
+            subject=bank_test.subject,
+            test_type=bank_test.test_type,
+            description=bank_test.description,
+            instructions=bank_test.instructions,
+            duration=bank_test.duration,
+            total_marks=bank_test.total_marks,
+            start_date=start_date,
+            end_date=end_date,
+            assignment_date=assignment_date_obj,
+            question_paper_url=bank_test.question_paper_url,
+            question_paper_name=bank_test.question_paper_name,
+            is_bank=False,
+            student_id=None,
+            mentor_id=identity['id']
+        )
+        db.session.add(assigned_test)
+        db.session.commit()
+        return jsonify({"message": "Written test assigned successfully", "id": assigned_test.id}), 201
+        
+    first_test_id = None
+    for student in students:
+        assigned_test = WrittenTest(
+            test_name=bank_test.test_name,
+            subject=bank_test.subject,
+            test_type=bank_test.test_type,
+            description=bank_test.description,
+            instructions=bank_test.instructions,
+            duration=bank_test.duration,
+            total_marks=bank_test.total_marks,
+            start_date=start_date,
+            end_date=end_date,
+            assignment_date=assignment_date_obj,
+            question_paper_url=bank_test.question_paper_url,
+            question_paper_name=bank_test.question_paper_name,
+            is_bank=False,
+            student_id=student.id,
+            mentor_id=identity['id']
+        )
+        db.session.add(assigned_test)
+        db.session.commit()
+        if not first_test_id:
+            first_test_id = assigned_test.id
+            
+        # Notify student
         notif = Notification(
             user_id=student.id,
             title="Written Test Scheduled",
-            content=f"A new written test '{assigned_test.test_name}' has been scheduled for {assigned_test.subject}",
+            content=f"A new written test '{assigned_test.test_name}' has been scheduled to start at {assigned_test.start_date.strftime('%Y-%m-%d %H:%M') if assigned_test.start_date else 'anytime'}.",
             notification_type="test"
         )
         db.session.add(notif)
         db.session.commit()
         
-    return jsonify({"message": "Written test assigned successfully", "id": assigned_test.id}), 201
+    return jsonify({"message": "Written test assigned successfully", "id": first_test_id}), 201
 
 @tests_bp.route('/<int:test_id>', methods=['DELETE'])
 @jwt_required()

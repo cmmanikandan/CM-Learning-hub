@@ -70,6 +70,8 @@ export interface LibraryMaterial {
   bookmarksCount?: number;
   viewsCount?: number;
   isBookmarked?: boolean;
+  student_id?: number | null;
+  student_name?: string;
 }
 
 export interface QuizQuestion {
@@ -96,6 +98,10 @@ export interface Quiz {
   totalMarks: number;
   is_bank?: boolean;
   assignment_date?: string;
+  start_time?: string;
+  end_time?: string;
+  student_id?: number;
+  student_name?: string;
   questions: QuizQuestion[];
   questions_count?: number;
   createdTime: string;
@@ -135,6 +141,8 @@ export interface WrittenTest {
   createdTime: string;
   is_bank?: boolean;
   assignment_date?: string;
+  student_id?: number;
+  student_name?: string;
 }
 
 export interface WrittenTestSubmission {
@@ -184,20 +192,20 @@ interface AppContextType {
   deleteHomework: (id: number) => void;
   duplicateHomework: (id: number) => void;
   libraryList: LibraryMaterial[];
-  addLibraryMaterial: (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'>) => void;
+  addLibraryMaterial: (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'> & { student_ids?: number[] }) => void;
   deleteLibraryMaterial: (id: number) => void;
   toggleBookmarkMaterial: (id: number) => void;
   quizList: Quiz[];
   quizBank: Quiz[];
-  addQuiz: (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'>) => void;
-  assignQuiz: (quizId: number, assignmentDate: string) => void;
+  addQuiz: (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'> & { student_ids?: number[]; start_time?: string; end_time?: string }) => void;
+  assignQuiz: (quizId: number, assignmentDate: string, payload?: { student_ids?: number[]; start_time?: string; end_time?: string }) => void;
   deleteQuiz: (id: number) => void;
   quizSubmissions: QuizSubmission[];
   submitQuiz: (sub: Omit<QuizSubmission, 'id' | 'studentId' | 'submittedAt'>, answers: any) => Promise<any>;
   writtenTests: WrittenTest[];
   writtenTestBank: WrittenTest[];
-  addWrittenTest: (test: Omit<WrittenTest, 'id' | 'createdTime'> & { is_bank?: boolean }) => void;
-  assignWrittenTest: (testId: number, startDate: string, endDate: string) => Promise<void>;
+  addWrittenTest: (test: Omit<WrittenTest, 'id' | 'createdTime'> & { is_bank?: boolean; student_ids?: number[] }) => Promise<void>;
+  assignWrittenTest: (testId: number, startDate: string, endDate: string, student_ids?: number[]) => Promise<void>;
   deleteWrittenTest: (id: number) => void;
   writtenTestSubmissions: WrittenTestSubmission[];
   submitWrittenTest: (testId: number, answerSheetUrl: string, answerSheetName: string) => void;
@@ -259,11 +267,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       if (user.role === 'mentor') {
         setMentorProfile(mappedProfile);
+        setStreakDays(0);
       } else if (user.role === 'student') {
         setStudentProfile(mappedProfile);
         if (typeof user.streak === 'number') {
           setStreakDays(user.streak);
         }
+      } else if (user.role === 'admin') {
+        setStreakDays(0);
       }
     }
   }, [user]);
@@ -725,7 +736,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addLibraryMaterial = (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'>) => {
+  const addLibraryMaterial = (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'> & { student_ids?: number[] }) => {
     fetch('http://127.0.0.1:5000/api/library', {
       method: 'POST',
       headers: getHeaders(),
@@ -736,7 +747,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: mat.description,
         tags: mat.tags.join(','),
         file_url: mat.fileUrl,
-        visibility: mat.visibility
+        visibility: mat.visibility,
+        student_ids: mat.student_ids
       })
     }).then(res => {
       if (res.ok) fetchLiveData();
@@ -783,7 +795,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   };
 
-  const addQuiz = (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'>) => {
+  const addQuiz = (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'> & { student_ids?: number[]; start_time?: string; end_time?: string }) => {
     fetch('http://127.0.0.1:5000/api/quiz', {
       method: 'POST',
       headers: getHeaders(),
@@ -798,20 +810,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         passing_marks: quiz.passingMarks,
         questions: quiz.questions,
         is_bank: quiz.is_bank,
-        assignment_date: quiz.assignment_date
+        assignment_date: quiz.assignment_date,
+        student_ids: quiz.student_ids,
+        start_time: quiz.start_time,
+        end_time: quiz.end_time
       })
     }).then(res => {
       if (res.ok) fetchLiveData();
     }).catch(console.error);
   };
 
-  const assignQuiz = (quizId: number, assignmentDate: string) => {
+  const assignQuiz = (quizId: number, assignmentDate: string, payload?: { student_ids?: number[]; start_time?: string; end_time?: string }) => {
     fetch('http://127.0.0.1:5000/api/quiz/assign', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
         quiz_id: quizId,
-        assignment_date: assignmentDate
+        assignment_date: assignmentDate,
+        student_ids: payload?.student_ids,
+        start_time: payload?.start_time,
+        end_time: payload?.end_time
       })
     }).then(res => {
       if (res.ok) fetchLiveData();
@@ -849,7 +867,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addWrittenTest = async (test: Omit<WrittenTest, 'id' | 'createdTime'> & { is_bank?: boolean }) => {
+  const addWrittenTest = async (test: Omit<WrittenTest, 'id' | 'createdTime'> & { is_bank?: boolean; student_ids?: number[] }) => {
     const res = await fetch('http://127.0.0.1:5000/api/tests', {
       method: 'POST',
       headers: getHeaders(),
@@ -865,7 +883,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         end_date: test.endDate,
         question_paper_url: test.questionPaperUrl,
         question_paper_name: test.questionPaperName,
-        is_bank: test.is_bank
+        is_bank: test.is_bank,
+        student_ids: test.student_ids
       })
     });
     
@@ -877,14 +896,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const assignWrittenTest = async (testId: number, startDate: string, endDate: string) => {
+  const assignWrittenTest = async (testId: number, startDate: string, endDate: string, student_ids?: number[]) => {
     const res = await fetch('http://127.0.0.1:5000/api/tests/assign', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
         test_id: testId,
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        student_ids: student_ids
       })
     });
     if (res.ok) {

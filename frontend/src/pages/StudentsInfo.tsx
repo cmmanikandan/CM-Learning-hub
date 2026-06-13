@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Award, Activity, Zap, CheckCircle2, MessageSquare, BookOpen } from 'lucide-react';
+import { ArrowLeft, Award, Zap, CheckCircle2, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const StudentsInfo: React.FC = () => {

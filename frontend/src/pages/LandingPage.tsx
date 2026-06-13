@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Activity, Award, ArrowRight, CheckCircle, Users, Zap, Shield, ChevronRight, Star, Globe } from 'lucide-react';
+import { BookOpen, Activity, Award, ArrowRight, CheckCircle, Users, Zap, Shield, ChevronRight, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const LandingPage: React.FC = () => {

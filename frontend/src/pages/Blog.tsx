@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Clock, Calendar, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Blog: React.FC = () => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Search, HelpCircle, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Search, Mail, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Help: React.FC = () => {

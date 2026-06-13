@@ -13,8 +13,7 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  TrendingUp,
-  Target
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -14,7 +14,24 @@ def create_app():
     app = Flask(__name__)
     
     # Configure app settings
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/cm_learning_hub')
+    db_uri = os.getenv('DATABASE_URL')
+    if db_uri:
+        from sqlalchemy import create_engine
+        try:
+            # Try to connect with a short timeout
+            connect_args = {"connect_timeout": 3} if db_uri.startswith("postgresql") else {}
+            engine = create_engine(db_uri, connect_args=connect_args)
+            with engine.connect() as conn:
+                app.logger.info("Successfully connected to the remote database.")
+        except Exception as e:
+            app.logger.warning(f"Could not connect to database specified in DATABASE_URL: {e}")
+            app.logger.info("Falling back to local SQLite database: cm_learning_hub.db")
+            db_uri = 'sqlite:///cm_learning_hub.db'
+    else:
+        db_uri = 'sqlite:///cm_learning_hub.db'
+        app.logger.info("DATABASE_URL not set. Using local SQLite database: cm_learning_hub.db")
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-key-cm-hub')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
@@ -78,8 +95,55 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
+            if User.query.count() == 0:
+                app.logger.info("SQLite database is empty, auto-seeding default users...")
+                from werkzeug.security import generate_password_hash
+                
+                # Create default mentor
+                mentor = User(
+                    username="admin_test",
+                    email="admin@cmlearninghub.com",
+                    password_hash=generate_password_hash("AdminPassword123!"),
+                    role="mentor",
+                    name="System Admin",
+                    tid="TID-ADMIN1"
+                )
+                db.session.add(mentor)
+                db.session.flush() # Get mentor ID
+                
+                # Create default student (no mentor)
+                student = User(
+                    username="studenttest",
+                    email="student@cmlearninghub.com",
+                    password_hash=generate_password_hash("student123"),
+                    role="student",
+                    name="Student Test",
+                    school="Westside Academy",
+                    class_name="Grade 10",
+                    section="Section B",
+                    parent_contact="+1 (555) 019-2834"
+                )
+                db.session.add(student)
+                
+                # Create default student 1 assigned to mentor 1
+                student1 = User(
+                    username="test_student_hw_1",
+                    email="student_hw_1@test.com",
+                    password_hash=generate_password_hash("student123"),
+                    role="student",
+                    name="Test Student 1",
+                    school="Westside Academy",
+                    class_name="Grade 10",
+                    section="Section B",
+                    parent_contact="+1 (555) 019-2834",
+                    mentor_id=mentor.id
+                )
+                db.session.add(student1)
+
+                db.session.commit()
+                app.logger.info("Default users seeded successfully!")
         except Exception as e:
-            app.logger.warning(f"Could not automatically create database tables: {e}")
+            app.logger.warning(f"Could not automatically create/seed database tables: {e}")
 
     return app
 

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, GraduationCap, Briefcase, Activity, RefreshCw,
-  Library, FileQuestion, FileText, BookOpen, TrendingUp,
-  Plus, ArrowRight, Shield, AlertTriangle, CheckCircle2,
-  UserPlus, Star, Zap, Flame, Trophy
+  Library, FileQuestion, TrendingUp,
+  ArrowRight, Shield, AlertTriangle, CheckCircle2,
+  UserPlus, Zap, Flame, Trophy
 } from 'lucide-react';
 
 interface AdminDashboardProps {

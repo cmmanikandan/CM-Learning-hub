@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Activity, Award, Zap, Users, Shield, MessageSquare, Bell, FileText } from 'lucide-react';
+import { ArrowLeft, BookOpen, Activity, Award, Zap, Shield, MessageSquare, Bell, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const FeaturesInfo: React.FC = () => {

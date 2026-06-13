@@ -30,6 +30,10 @@ def get_library_materials():
                 LibraryMaterial.uploaded_by_id == m_id,
                 LibraryMaterial.uploaded_by_id.is_(None),
                 LibraryMaterial.uploaded_by_id.in_(admin_ids)
+            ),
+            or_(
+                LibraryMaterial.student_id == user_id,
+                LibraryMaterial.student_id.is_(None)
             )
         )
     elif role == 'mentor':
@@ -58,6 +62,12 @@ def get_library_materials():
     result = []
     for mat in materials:
         is_bookmarked = f",{mat.id}," in bookmarks
+        student_name = ""
+        if mat.student_id:
+            s_user = User.query.get(mat.student_id)
+            if s_user:
+                student_name = s_user.name
+                
         result.append({
             "id": mat.id,
             "title": mat.title,
@@ -69,6 +79,8 @@ def get_library_materials():
             "thumbnail_url": mat.thumbnail_url,
             "visibility": mat.visibility,
             "is_bookmarked": is_bookmarked,
+            "student_id": mat.student_id,
+            "student_name": student_name,
             "created_at": mat.created_at.isoformat()
         })
         
@@ -90,36 +102,79 @@ def upload_material():
     if not title or not file_url or not category or not subject:
         return jsonify({"message": "Missing required fields"}), 400
         
-    new_material = LibraryMaterial(
-        title=title,
-        subject=subject,
-        category=category,
-        description=data.get('description'),
-        tags=data.get('tags'),
-        file_url=file_url,
-        thumbnail_url=data.get('thumbnail_url'),
-        visibility=data.get('visibility', 'Public'),
-        uploaded_by_id=identity['id']
-    )
+    # Target students
+    student_ids = data.get('student_ids')
     
-    db.session.add(new_material)
-    db.session.commit()
-    
-    # Notify student (only notify students assigned to this mentor)
     from models import User
-    students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
-    if new_material.visibility == 'Public':
-        for student in students:
-            notif = Notification(
-                user_id=student.id,
-                title="New Resource Uploaded",
-                content=f"A new file has been added to the library by your mentor: {new_material.title} ({new_material.category})",
-                notification_type="material"
-            )
-            db.session.add(notif)
+    if student_ids:
+        students = User.query.filter(
+            User.id.in_(student_ids),
+            User.mentor_id == identity['id'],
+            User.role == 'student'
+        ).all()
+    else:
+        students = []
+        
+    if not students:
+        new_material = LibraryMaterial(
+            title=title,
+            subject=subject,
+            category=category,
+            description=data.get('description'),
+            tags=data.get('tags'),
+            file_url=file_url,
+            thumbnail_url=data.get('thumbnail_url'),
+            visibility=data.get('visibility', 'Public'),
+            uploaded_by_id=identity['id'],
+            student_id=None
+        )
+        db.session.add(new_material)
         db.session.commit()
         
-    return jsonify({"message": "Material uploaded successfully", "id": new_material.id}), 201
+        # Notify all students of mentor
+        all_students = User.query.filter_by(mentor_id=identity['id'], role='student').all()
+        if new_material.visibility == 'Public':
+            for student in all_students:
+                notif = Notification(
+                    user_id=student.id,
+                    title="New Resource Uploaded",
+                    content=f"A new file has been added to the library by your mentor: {new_material.title} ({new_material.category})",
+                    notification_type="material"
+                )
+                db.session.add(notif)
+            db.session.commit()
+            
+        return jsonify({"message": "Material uploaded successfully", "id": new_material.id}), 201
+        
+    first_mat_id = None
+    for student in students:
+        new_material = LibraryMaterial(
+            title=title,
+            subject=subject,
+            category=category,
+            description=data.get('description'),
+            tags=data.get('tags'),
+            file_url=file_url,
+            thumbnail_url=data.get('thumbnail_url'),
+            visibility=data.get('visibility', 'Public'),
+            uploaded_by_id=identity['id'],
+            student_id=student.id
+        )
+        db.session.add(new_material)
+        db.session.commit()
+        if not first_mat_id:
+            first_mat_id = new_material.id
+            
+        notif = Notification(
+            user_id=student.id,
+            title="New Resource Uploaded",
+            content=f"A new file has been added to the library by your mentor: {new_material.title} ({new_material.category})",
+            notification_type="material"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        
+    return jsonify({"message": "Material uploaded successfully", "id": first_mat_id}), 201
 
 @library_bp.route('/<int:mat_id>', methods=['DELETE'])
 @jwt_required()

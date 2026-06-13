@@ -94,7 +94,7 @@ def login():
             "section": user.section,
             "parent_contact": user.parent_contact,
             "photo_url": user.photo_url,
-            "streak": user.streak
+            "streak": user.streak if user.role == 'student' else 0
         }
     }), 200
 
@@ -178,7 +178,7 @@ def firebase_login():
                 "section": user.section,
                 "parent_contact": user.parent_contact,
                 "photo_url": user.photo_url,
-                "streak": user.streak
+                "streak": user.streak if user.role == 'student' else 0
             }
         }), 200
         
@@ -212,7 +212,7 @@ def get_profile():
         "section": user.section,
         "parent_contact": user.parent_contact,
         "photo_url": user.photo_url,
-        "streak": user.streak,
+        "streak": user.streak if user.role == 'student' else 0,
         "mentor_notes": user.mentor_notes
     }), 200
 

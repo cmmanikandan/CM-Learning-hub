@@ -97,7 +97,8 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
     libraryList, 
     addLibraryMaterial, 
     deleteLibraryMaterial, 
-    toggleBookmarkMaterial 
+    toggleBookmarkMaterial,
+    myStudents
   } = useApp();
 
   // Filters
@@ -105,6 +106,21 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  // Target assignment states
+  const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+
+  React.useEffect(() => {
+    if (!showUploadModal) {
+      setAssignTarget('all');
+      setSelectedClasses([]);
+      setSelectedStudentIds([]);
+    }
+  }, [showUploadModal]);
+
+  const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
 
   // Uploader form data
   const [formData, setFormData] = useState({
@@ -154,6 +170,21 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
 
     const tags = formData.tagsString.split(',').map(tag => tag.trim()).filter(Boolean);
 
+    let student_ids: number[] | undefined = undefined;
+    if (assignTarget === 'class') {
+      student_ids = (myStudents || []).filter(s => selectedClasses.includes(s.className || '')).map(s => s.id);
+      if (student_ids.length === 0) {
+        alert("Please select at least one standard/class.");
+        return;
+      }
+    } else if (assignTarget === 'students') {
+      student_ids = selectedStudentIds;
+      if (student_ids.length === 0) {
+        alert("Please select at least one student.");
+        return;
+      }
+    }
+
     addLibraryMaterial({
       title: formData.title,
       subject: formData.subject,
@@ -162,7 +193,8 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
       tags,
       fileName: formData.fileName,
       fileUrl: formData.fileUrl || '',
-      visibility: formData.visibility
+      visibility: formData.visibility,
+      student_ids
     });
 
     // Reset Form
@@ -176,6 +208,9 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
       fileUrl: '',
       visibility: 'Public'
     });
+    setAssignTarget('all');
+    setSelectedClasses([]);
+    setSelectedStudentIds([]);
     setShowUploadModal(false);
   };
 
@@ -189,6 +224,25 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
 
     return matchesSearch && matchesCategory && matchesBookmarks;
   });
+
+  // Group materials for mentor view to avoid duplicates
+  const displayMaterials = React.useMemo(() => {
+    const matches = filteredMaterials;
+    if (role !== 'mentor') return matches;
+
+    const groups: Record<string, LibraryMaterial & { student_names: string[] }> = {};
+    matches.forEach(mat => {
+      const key = mat.fileUrl || mat.title;
+      if (!groups[key]) {
+        groups[key] = { ...mat, student_names: [] };
+      }
+      if (mat.student_name) {
+        groups[key].student_names.push(mat.student_name);
+      }
+    });
+
+    return Object.values(groups);
+  }, [filteredMaterials, role]);
 
   // Select icons based on category
   const getCategoryIcon = (category: string) => {
@@ -395,8 +449,8 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
 
       {/* ── Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredMaterials.length > 0 ? (
-          filteredMaterials.map((mat, index) => {
+        {displayMaterials.length > 0 ? (
+          displayMaterials.map((mat, index) => {
             const theme = getCardTheme(index);
             return (
               <div 
@@ -447,6 +501,16 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                       </h4>
                       {mat.description && (
                         <p className="text-xs text-slate-400 mt-1.5 leading-relaxed line-clamp-2">{mat.description}</p>
+                      )}
+                      
+                      {role === 'mentor' && (
+                        <div className="mt-2 text-[10px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-1.5 rounded-lg border border-slate-200/5">
+                          Target: {(mat as any).student_names && (mat as any).student_names.length > 0 ? (
+                            <span className="text-primary-600 dark:text-primary-400">{(mat as any).student_names.join(', ')}</span>
+                          ) : (
+                            <span className="text-success-650 dark:text-success-400">All Students</span>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -624,6 +688,97 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                   </select>
                 </div>
               </div>
+
+              {/* Target Assignment Selection */}
+              {role === 'mentor' && (
+                <div className="space-y-3 p-4 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 font-outfit tracking-wide">Assign To</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="libAssignTarget" 
+                          value="all" 
+                          checked={assignTarget === 'all'} 
+                          onChange={() => setAssignTarget('all')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        All Students
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="libAssignTarget" 
+                          value="class" 
+                          checked={assignTarget === 'class'} 
+                          onChange={() => setAssignTarget('class')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        By Standard/Class
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="libAssignTarget" 
+                          value="students" 
+                          checked={assignTarget === 'students'} 
+                          onChange={() => setAssignTarget('students')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        Specific Students
+                      </label>
+                    </div>
+                  </div>
+
+                  {assignTarget === 'class' && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Select Classes</label>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueClasses.map(cls => (
+                          <label key={cls} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedClasses.includes(cls)} 
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedClasses([...selectedClasses, cls]);
+                                else setSelectedClasses(selectedClasses.filter(c => c !== cls));
+                              }}
+                              className="text-primary-600 focus:ring-primary-500 rounded" 
+                            />
+                            {cls}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {assignTarget === 'students' && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Select Students</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(myStudents || []).map(st => (
+                          <label key={st.id} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedStudentIds.includes(st.id)} 
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, st.id]);
+                                else setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                              }}
+                              className="text-primary-600 focus:ring-primary-500 rounded" 
+                            />
+                            <div className="truncate">
+                              <p className="leading-tight">{st.name}</p>
+                              {st.className && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{st.className}</p>}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Supported formats */}
               <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl">

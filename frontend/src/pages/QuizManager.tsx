@@ -66,6 +66,78 @@ const CARD_THEMES = [
 
 const getCardTheme = (index: number) => CARD_THEMES[index % CARD_THEMES.length];
 
+const LiveCountdown: React.FC<{ startTime?: string; endTime?: string; onUpdate?: () => void }> = ({ startTime, endTime, onUpdate }) => {
+  const [status, setStatus] = useState<'future' | 'active' | 'expired'>('active');
+  const [timeLeftString, setTimeLeftString] = useState('');
+
+  useEffect(() => {
+    if (!startTime && !endTime) {
+      setStatus('active');
+      setTimeLeftString('Open');
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const start = startTime ? new Date(startTime).getTime() : 0;
+      const end = endTime ? new Date(endTime).getTime() : Infinity;
+
+      if (startTime && now < start) {
+        setStatus('future');
+        const diff = start - now;
+        const hrs = Math.floor(diff / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        setTimeLeftString(`Starts in: ${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      } else if (endTime && now > end) {
+        setStatus('expired');
+        setTimeLeftString('Closed');
+        if (onUpdate) onUpdate();
+      } else {
+        setStatus('active');
+        if (endTime && end !== Infinity) {
+          const diff = end - now;
+          const hrs = Math.floor(diff / 3600000);
+          const mins = Math.floor((diff % 3600000) / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          setTimeLeftString(`Ends in: ${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+        } else {
+          setTimeLeftString('Open');
+        }
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [startTime, endTime]);
+
+  if (status === 'future') {
+    return (
+      <span className="flex items-center gap-1 bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold border border-amber-250/20">
+        <Clock className="w-3.5 h-3.5 animate-pulse text-amber-500" />
+        {timeLeftString}
+      </span>
+    );
+  }
+
+  if (status === 'expired') {
+    return (
+      <span className="flex items-center gap-1 bg-red-50 text-red-650 dark:bg-red-950/20 dark:text-red-400 text-[10px] px-2 py-0.5 rounded font-bold border border-red-255/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-red-550" />
+        {timeLeftString}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1 bg-success-50 text-success-650 dark:bg-success-950/20 dark:text-success-400 text-[10px] px-2 py-0.5 rounded font-bold border border-success-255/20">
+      <Clock className="w-3.5 h-3.5 text-success-500" />
+      {timeLeftString}
+    </span>
+  );
+};
+
 interface QuizManagerProps {
   showCreateModal: boolean;
   setShowCreateModal: (show: boolean) => void;
@@ -83,10 +155,64 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     assignQuiz,
     deleteQuiz,
     quizSubmissions, 
-    submitQuiz 
+    submitQuiz,
+    myStudents
   } = useApp();
 
   const { token } = useAuth();
+
+  // Target assignment states
+  const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+  const [assignStartTime, setAssignStartTime] = useState('');
+  const [assignEndTime, setAssignEndTime] = useState('');
+
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  const groupedActiveQuizzes = React.useMemo(() => {
+    // Filter active quizzes for the selected date
+    const dayQuizzes = quizList.filter(q => 
+      !q.is_bank && q.assignment_date === selectedScheduleDate
+    );
+
+    // Group them by quizName + subject
+    const groups: Record<string, {
+      quizName: string;
+      subject: string;
+      chapter: string;
+      timeLimit: number;
+      passingMarks: number;
+      totalMarks: number;
+      start_time: string;
+      end_time: string;
+      clones: any[];
+    }> = {};
+
+    dayQuizzes.forEach(quiz => {
+      const key = `${quiz.quizName}_${quiz.subject}`;
+      if (!groups[key]) {
+        groups[key] = {
+          quizName: quiz.quizName,
+          subject: quiz.subject,
+          chapter: quiz.chapter || '',
+          timeLimit: quiz.timeLimit || 10,
+          passingMarks: quiz.passingMarks || 50,
+          totalMarks: quiz.totalMarks || 10,
+          start_time: quiz.start_time || '',
+          end_time: quiz.end_time || '',
+          clones: []
+        };
+      }
+      groups[key].clones.push(quiz);
+    });
+
+    return Object.values(groups);
+  }, [quizList, selectedScheduleDate]);
+
+  const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
 
   // AI assistant states
   const [aiTopic, setAiTopic] = useState('');
@@ -129,6 +255,13 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
 
   // Active student view states
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [cheatWarnings, setCheatWarnings] = useState(0);
@@ -389,6 +522,17 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     e.preventDefault();
     if (!quizName || questions.some(q => !q.questionText)) return;
 
+    let studentIds: number[] | undefined = undefined;
+    if (!isBank) {
+      if (assignTarget === 'class') {
+        studentIds = (myStudents || [])
+          .filter(s => s.className && selectedClasses.includes(s.className))
+          .map(s => s.id);
+      } else if (assignTarget === 'students') {
+        studentIds = selectedStudentIds;
+      }
+    }
+
     addQuiz({
       quizName,
       subject,
@@ -399,7 +543,11 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
       timeLimit,
       passingMarks,
       is_bank: isBank,
-      questions
+      questions,
+      student_ids: studentIds,
+      start_time: !isBank && assignStartTime ? new Date(assignStartTime).toISOString() : undefined,
+      end_time: !isBank && assignEndTime ? new Date(assignEndTime).toISOString() : undefined,
+      assignment_date: !isBank ? assignDate : undefined
     });
 
     // Reset Form
@@ -419,14 +567,175 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
         marks: 1
       }
     ]);
+    setIsBank(true);
+    setAssignTarget('all');
+    setSelectedClasses([]);
+    setSelectedStudentIds([]);
+    setAssignStartTime('');
+    setAssignEndTime('');
+    setAssignDate(new Date().toISOString().split('T')[0]);
     setShowCreateModal(false);
+  };
+
+  const QUIZ_SUGGESTIONS = [
+    {
+      subject: "Mathematics",
+      quizName: "Algebra Basics Quiz",
+      chapter: "Algebra",
+      lesson: "Equations",
+      difficulty: "Medium" as const,
+      timeLimit: 15,
+      passingMarks: 50,
+      totalMarks: 4,
+      questions: [
+        {
+          id: "sq1",
+          questionType: "mcq" as const,
+          questionText: "Solve for x: 2x + 5 = 15",
+          options: ["3", "5", "10", "15"],
+          correctAnswer: "5",
+          explanation: "Subtract 5 from both sides to get 2x = 10, then divide by 2.",
+          marks: 2
+        },
+        {
+          id: "sq2",
+          questionType: "mcq" as const,
+          questionText: "What is the value of x^2 - 4 when x = 3?",
+          options: ["5", "9", "4", "3"],
+          correctAnswer: "5",
+          explanation: "3^2 - 4 = 9 - 4 = 5.",
+          marks: 2
+        }
+      ]
+    },
+    {
+      subject: "Physics",
+      quizName: "Optics & Light Quiz",
+      chapter: "Optics",
+      lesson: "Refraction",
+      difficulty: "Medium" as const,
+      timeLimit: 10,
+      passingMarks: 60,
+      totalMarks: 5,
+      questions: [
+        {
+          id: "sq3",
+          questionType: "true_false" as const,
+          questionText: "Light travels faster in water than in air.",
+          options: [],
+          correctAnswer: "false",
+          explanation: "Light travels slower in denser mediums like water than in air.",
+          marks: 5
+        }
+      ]
+    },
+    {
+      subject: "Chemistry",
+      quizName: "Chemical Bonds Intro",
+      chapter: "Bonds",
+      lesson: "Covalent Bonds",
+      difficulty: "Easy" as const,
+      timeLimit: 12,
+      passingMarks: 50,
+      totalMarks: 2,
+      questions: [
+        {
+          id: "sq4",
+          questionType: "fill_blank" as const,
+          questionText: "Water molecules are held together by ___ bonds.",
+          options: [],
+          correctAnswer: "covalent",
+          explanation: "Hydrogen and oxygen share electrons, forming covalent bonds.",
+          marks: 2
+        }
+      ]
+    }
+  ];
+
+  const handleApplySuggestion = (sug: typeof QUIZ_SUGGESTIONS[0]) => {
+    setQuizName(sug.quizName);
+    setSubject(sug.subject);
+    setChapter(sug.chapter);
+    setLesson(sug.lesson);
+    setDifficulty(sug.difficulty);
+    setTimeLimit(sug.timeLimit);
+    setPassingMarks(sug.passingMarks);
+    setIsBank(false);
+    setQuestions(sug.questions.map((q, idx) => ({
+      id: 'q_' + Date.now() + '_' + idx,
+      questionType: q.questionType,
+      questionText: q.questionText,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+      explanation: q.explanation,
+      marks: q.marks
+    })));
+    setShowCreateModal(true);
+  };
+
+  const renderCalendar = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    const days: React.ReactNode[] = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="p-2 text-transparent">.</div>);
+    }
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isSelected = selectedScheduleDate === dateStr;
+      const hasQuiz = quizList.some(q => !q.is_bank && q.assignment_date === dateStr);
+      
+      days.push(
+        <button
+          key={d}
+          type="button"
+          onClick={() => setSelectedScheduleDate(dateStr)}
+          className={`p-2.5 border rounded-xl flex flex-col items-center justify-between transition-all relative ${
+            isSelected 
+              ? 'bg-primary-500 border-primary-500 text-white shadow-md shadow-primary-500/25' 
+              : 'border-slate-100 dark:border-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-slate-850 dark:text-slate-200'
+          }`}
+        >
+          <span className="text-xs font-black">{d}</span>
+          {hasQuiz && (
+            <span className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-primary-500'}`} />
+          )}
+        </button>
+      );
+    }
+    return days;
   };
 
   const handleAssignSubmit = (id: number) => {
     if (!assignDate) return;
-    assignQuiz(id, assignDate);
+    
+    let studentIds: number[] | undefined = undefined;
+    if (assignTarget === 'class') {
+      studentIds = (myStudents || [])
+        .filter(s => s.className && selectedClasses.includes(s.className))
+        .map(s => s.id);
+    } else if (assignTarget === 'students') {
+      studentIds = selectedStudentIds;
+    }
+    
+    assignQuiz(id, assignDate, {
+      student_ids: studentIds,
+      start_time: assignStartTime ? new Date(assignStartTime).toISOString() : undefined,
+      end_time: assignEndTime ? new Date(assignEndTime).toISOString() : undefined
+    });
+    
     setShowAssignModal(null);
     setAssignDate('');
+    setAssignStartTime('');
+    setAssignEndTime('');
+    setAssignTarget('all');
+    setSelectedClasses([]);
+    setSelectedStudentIds([]);
   };
 
   return (
@@ -475,121 +784,191 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
           </div>
 
           {activeTab === 'dashboard' ? (
-            <>
-              {/* List of active assigned quizzes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {quizList.filter(q => !q.is_bank).map((quiz, index) => {
-                  const theme = getCardTheme(index);
-                  return (
-                    <div key={quiz.id} className="premium-outline-card flex flex-col justify-between relative border border-slate-200 dark:border-slate-800">
-                      <div className={`h-1.5 w-full bg-gradient-to-r ${theme.gradient}`} />
-                      <div className="p-5 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className={`bg-gradient-to-r ${theme.gradient} text-white px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg tracking-wider`}>
-                              {quiz.subject}
-                            </span>
-                            
-                            <div className="flex items-center space-x-2">
-                              <span className="text-[10px] font-bold bg-warning-50 text-warning-600 dark:bg-warning-950/20 dark:text-warning-400 px-3 py-1 rounded-full border border-warning-200/50">
-                                Assigned: {quiz.assignment_date}
-                              </span>
-                              
-                              <button
-                                onClick={() => deleteQuiz(quiz.id)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-danger-650 hover:bg-danger-50 dark:hover:bg-danger-950/20 transition-colors"
-                                title="Delete Quiz"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Calendar Column */}
+              <div className="space-y-4">
+                <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <Calendar className="w-4.5 h-4.5 text-primary-500" />
+                    <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                      Schedule Calendar
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
+                    {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {renderCalendar()}
+                  </div>
+                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
+                    <p className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                      Dots indicate dates with assigned quizzes.
+                    </p>
+                    <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+                  </div>
+                </div>
 
-                          <h3 className="font-extrabold text-base text-slate-800 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">{quiz.quizName}</h3>
-                          <p className="text-xs text-slate-400 mt-1 font-semibold">Chapter: {quiz.chapter || 'N/A'}</p>
-                          
-                          <div className="mt-4 p-2.5 bg-slate-50 dark:bg-slate-800/85 p-2 rounded-xl border border-slate-100 dark:border-slate-800/40 flex flex-col gap-2.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center space-x-1.5 text-slate-500 min-w-0">
-                                <FileText className="w-4 h-4 text-slate-450 shrink-0" />
-                                <span className="truncate text-slate-655 dark:text-slate-350">{quiz.questions_count || quiz.questions?.length || 0} Questions</span>
-                              </div>
-                              <button 
-                                onClick={() => handlePreviewQuiz(quiz.id)}
-                                className="text-[10px] font-bold text-primary-500 hover:underline shrink-0"
-                              >
-                                Preview Quiz
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                            <div className="bg-slate-50 dark:bg-slate-800/85 p-2 rounded-xl border border-slate-100 dark:border-slate-800/40">
-                              <p className="text-[9px] text-slate-400 font-bold uppercase">Time Limit</p>
-                              <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">{quiz.timeLimit}m</p>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-800/85 p-2 rounded-xl border border-slate-100 dark:border-slate-800/40">
-                              <p className="text-[9px] text-slate-400 font-bold uppercase">Passing</p>
-                              <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">{quiz.passingMarks}%</p>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-800/85 p-2 rounded-xl border border-slate-100 dark:border-slate-800/40">
-                              <p className="text-[9px] text-slate-400 font-bold uppercase">Total Marks</p>
-                              <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">{quiz.totalMarks}</p>
-                            </div>
-                          </div>
+                {/* Suggestions Panel */}
+                <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <Sparkles className="w-4.5 h-4.5 text-primary-500 animate-pulse" />
+                    <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                      Preset Suggestions
+                    </h3>
+                  </div>
+                  <p className="text-[10px] text-slate-450 font-semibold mb-3 leading-tight">
+                    Quickly pre-fill and assign a preset quiz template for {selectedScheduleDate}:
+                  </p>
+                  <div className="space-y-2.5">
+                    {QUIZ_SUGGESTIONS.map((sug, idx) => (
+                      <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-xl flex items-center justify-between gap-3 hover:border-primary-200 transition-all">
+                        <div className="min-w-0">
+                          <span className="text-[9px] font-black uppercase text-primary-500 tracking-wider">{sug.subject}</span>
+                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">{sug.quizName}</h4>
+                          <p className="text-[9px] text-slate-400 font-medium">{sug.chapter} • {sug.timeLimit}m • {sug.totalMarks} Marks</p>
                         </div>
-
-                        <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-400 font-bold">
-                          <span>Difficulty: <strong className="text-slate-655 dark:text-slate-350">{quiz.difficulty}</strong></span>
-                          <span className="text-slate-500">{quiz.questions_count || quiz.questions?.length || 0} Questions</span>
-                        </div>
+                        <button
+                          onClick={() => handleApplySuggestion(sug)}
+                          className="px-2.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[10px] font-bold shadow-sm shrink-0 active:scale-95 transition-all"
+                        >
+                          Apply
+                        </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Historical submissions Reports */}
-              <div className="glass-panel p-5 rounded-2xl mt-6">
-                <h3 className="font-bold text-base text-slate-800 dark:text-white mb-4 font-outfit">Recent Submissions</h3>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-100 dark:border-slate-800">
-                        <th className="px-4 py-3">Quiz Name</th>
-                        <th className="px-4 py-3">Subject</th>
-                        <th className="px-4 py-3">Score</th>
-                        <th className="px-4 py-3">Accuracy</th>
-                        <th className="px-4 py-3">Time Taken</th>
-                        <th className="px-4 py-3">Date Submitted</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                      {quizSubmissions.length > 0 ? (
-                        quizSubmissions.map((sub) => (
-                          <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                            <td className="px-4 py-3 font-bold text-slate-800 dark:text-white font-outfit">{sub.quizName}</td>
-                            <td className="px-4 py-3 font-semibold text-xs text-primary-600">{sub.subject}</td>
-                            <td className="px-4 py-3 font-extrabold">{sub.score} / {sub.totalMarks}</td>
-                            <td className="px-4 py-3 font-extrabold text-success-600">{sub.accuracy.toFixed(0)}%</td>
-                            <td className="px-4 py-3 font-medium text-xs">{Math.floor(sub.timeTaken / 60)}m {sub.timeTaken % 60}s</td>
-                            <td className="px-4 py-3 text-xs text-slate-400">{new Date(sub.submittedAt).toLocaleDateString()}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="text-center py-6 text-slate-400">No submissions recorded yet.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </>
+
+              {/* Day's Assignments list */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-slate-450 uppercase tracking-wider">Scheduled Quizzes for {selectedScheduleDate}</h3>
+                  <span className="text-xs font-bold text-primary-500 bg-primary-50 dark:bg-primary-950/20 px-2 py-0.5 rounded-full">{groupedActiveQuizzes.length} Quizzes</span>
+                </div>
+
+                {groupedActiveQuizzes.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {groupedActiveQuizzes.map((grouped, index) => {
+                      const theme = getCardTheme(index);
+                      const totalAssigned = grouped.clones.length;
+                      const completedClones = grouped.clones.filter(clone => 
+                        quizSubmissions.some(sub => sub.quizId === clone.id)
+                      );
+                      const completedCount = completedClones.length;
+                      const completionPercentage = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0;
+                      
+                      return (
+                        <div key={grouped.quizName} className="premium-outline-card flex flex-col justify-between border border-slate-200 dark:border-slate-800 relative">
+                          <div className={`h-1.5 w-full bg-gradient-to-r ${theme.gradient}`} />
+                          <div className="p-5 flex-1 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className={`bg-gradient-to-r ${theme.gradient} text-white px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg tracking-wider`}>
+                                  {grouped.subject}
+                                </span>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      grouped.clones.forEach(clone => deleteQuiz(clone.id));
+                                    }}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-danger-650 hover:bg-danger-50 dark:hover:bg-danger-950/20 transition-colors"
+                                    title="Delete Quiz Group"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <h3 className="font-extrabold text-base text-slate-805 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">{grouped.quizName}</h3>
+                              <p className="text-xs text-slate-400 mt-1 font-semibold">Chapter: {grouped.chapter || 'N/A'}</p>
+                              
+                              <div className="mt-4 p-2.5 bg-slate-50 dark:bg-slate-800/85 rounded-xl border border-slate-100 dark:border-slate-800/40 flex flex-col gap-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center space-x-1.5 text-slate-500 min-w-0">
+                                    <FileText className="w-4 h-4 text-slate-450 shrink-0" />
+                                    <span className="truncate text-slate-655 dark:text-slate-350">{grouped.totalMarks} Marks • {grouped.timeLimit}m</span>
+                                  </div>
+                                  {grouped.clones[0] && (
+                                    <button 
+                                      onClick={() => handlePreviewQuiz(grouped.clones[0].id)}
+                                      className="text-[10px] font-bold text-primary-500 hover:underline shrink-0"
+                                    >
+                                      Preview Quiz
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Scheduling timings */}
+                              {(grouped.start_time || grouped.end_time) && (
+                                <div className="mt-3.5 p-2 bg-slate-100/60 dark:bg-slate-800/40 rounded-xl text-[9px] text-slate-500 font-bold space-y-0.5">
+                                  {grouped.start_time && (
+                                    <p>Starts: <span className="text-slate-700 dark:text-slate-350">{new Date(grouped.start_time).toLocaleString()}</span></p>
+                                  )}
+                                  {grouped.end_time && (
+                                    <p>Ends: <span className="text-slate-700 dark:text-slate-355">{new Date(grouped.end_time).toLocaleString()}</span></p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Progress bar */}
+                              <div className="mt-4">
+                                <div className="flex justify-between items-center text-[10px] mb-1 font-bold text-slate-450 uppercase">
+                                  <span>Completion</span>
+                                  <span>{completedCount} / {totalAssigned} Students</span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-200/10">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${theme.gradient}`}
+                                    style={{ width: `${completionPercentage}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Student completion details list */}
+                              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">Students Assigned:</p>
+                                <div className="grid grid-cols-1 gap-1 max-h-24 overflow-y-auto pr-1">
+                                  {grouped.clones.map(clone => {
+                                    const isDone = quizSubmissions.some(sub => sub.quizId === clone.id);
+                                    const studentSub = quizSubmissions.find(sub => sub.quizId === clone.id);
+                                    return (
+                                      <div key={clone.id} className="flex items-center justify-between p-1 bg-slate-50/50 dark:bg-slate-850/50 rounded-lg text-[10px]">
+                                        <span className="font-extrabold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{clone.student_name}</span>
+                                        <span className={`font-bold px-1.5 py-0.5 rounded-full ${
+                                          isDone 
+                                            ? 'bg-success-50 text-success-700 dark:bg-success-950/20 dark:text-success-400' 
+                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
+                                        }`}>
+                                          {isDone ? `✓ ${studentSub?.score}/${clone.totalMarks}` : 'Pending'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-16 flex flex-col items-center justify-center text-center glass-panel p-8 rounded-3xl bg-white dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3 shadow-inner">
+                      <Clock className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <h3 className="font-bold text-slate-700 dark:text-slate-350 font-outfit text-base">No Quizzes Scheduled</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no quizzes assigned for {selectedScheduleDate}. Apply one of our suggestions on the left, or create a template to get started!</p>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <>
-              {/* QUIZ BANK */}
+              {/* QUIZ BANK TEMPLATES */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {quizBank.map((quiz, index) => {
                   const theme = getCardTheme(index);
@@ -604,7 +983,10 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                           
                           <div className="flex space-x-2">
                              <button
-                              onClick={() => setShowAssignModal(quiz.id)}
+                              onClick={() => {
+                                setAssignDate(new Date().toISOString().split('T')[0]);
+                                setShowAssignModal(quiz.id);
+                              }}
                               className="p-1.5 rounded-lg text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 transition-colors flex items-center text-xs font-bold"
                               title="Assign Quiz"
                             >
@@ -628,7 +1010,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                         <div className="mt-3.5 p-2.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl flex flex-col gap-2.5">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center space-x-1.5 text-slate-500 min-w-0">
-                              <FileText className="w-4 h-4 text-slate-450 shrink-0" />
+                              <FileText className="w-4 h-4 text-slate-455 shrink-0" />
                               <span className="truncate text-slate-655 dark:text-slate-350" title={`${quiz.questions_count || quiz.questions?.length || 0} Questions`}>
                                 {quiz.questions_count || quiz.questions?.length || 0} Questions
                               </span>
@@ -656,25 +1038,195 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Historical submissions Reports */}
+              <div className="glass-panel p-5 rounded-2xl mt-6">
+                <h3 className="font-bold text-base text-slate-800 dark:text-white mb-4 font-outfit">Recent Submissions</h3>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-100 dark:border-slate-800">
+                        <th className="px-4 py-3">Quiz Name</th>
+                        <th className="px-4 py-3">Subject</th>
+                        <th className="px-4 py-3">Score</th>
+                        <th className="px-4 py-3">Accuracy</th>
+                        <th className="px-4 py-3">Time Taken</th>
+                        <th className="px-4 py-3">Date Submitted</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                      {quizSubmissions.length > 0 ? (
+                        quizSubmissions.map((sub) => (
+                          <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                            <td className="px-4 py-3 font-bold text-slate-800 dark:text-white font-outfit">{sub.quizName}</td>
+                            <td className="px-4 py-3 font-semibold text-xs text-primary-650">{sub.subject}</td>
+                            <td className="px-4 py-3 font-extrabold">{sub.score} / {sub.totalMarks}</td>
+                            <td className="px-4 py-3 font-extrabold text-success-600">{sub.accuracy.toFixed(0)}%</td>
+                            <td className="px-4 py-3 font-medium text-xs">{Math.floor(sub.timeTaken / 60)}m {sub.timeTaken % 60}s</td>
+                            <td className="px-4 py-3 text-xs text-slate-400">{new Date(sub.submittedAt).toLocaleDateString()}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-slate-400">No submissions recorded yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </>
           )}
 
           {/* Assign Modal */}
           {showAssignModal && (
-             <ModalPortal onClose={() => setShowAssignModal(null)}>
-              <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-full max-w-sm border border-slate-100 dark:border-slate-800 shadow-2xl">
-                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Assign Quiz</h3>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Assignment Date</label>
-                <input 
-                  type="date" 
-                  value={assignDate}
-                  onChange={(e) => setAssignDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none mb-4"
-                  required
-                />
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setShowAssignModal(null)} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
-                  <button onClick={() => handleAssignSubmit(showAssignModal)} className="px-3 py-1.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg">Assign Now</button>
+             <ModalPortal onClose={() => {
+               setShowAssignModal(null);
+               setAssignTarget('all');
+               setSelectedClasses([]);
+               setSelectedStudentIds([]);
+               setAssignStartTime('');
+               setAssignEndTime('');
+             }}>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md border border-slate-100 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[85vh] animate-scaleIn">
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4 font-outfit">Assign Quiz & Schedule</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Assignment Date</label>
+                    <input 
+                      type="date" 
+                      value={assignDate}
+                      onChange={(e) => setAssignDate(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Time (Optional)</label>
+                      <input 
+                        type="datetime-local" 
+                        value={assignStartTime}
+                        onChange={(e) => setAssignStartTime(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Time (Optional)</label>
+                      <input 
+                        type="datetime-local" 
+                        value={assignEndTime}
+                        onChange={(e) => setAssignEndTime(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800/40">
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 font-outfit tracking-wide">Target Students</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="quizAssignTarget" 
+                          value="all" 
+                          checked={assignTarget === 'all'} 
+                          onChange={() => setAssignTarget('all')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        All Assigned Students
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="quizAssignTarget" 
+                          value="class" 
+                          checked={assignTarget === 'class'} 
+                          onChange={() => setAssignTarget('class')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        By Standard/Class
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="quizAssignTarget" 
+                          value="students" 
+                          checked={assignTarget === 'students'} 
+                          onChange={() => setAssignTarget('students')} 
+                          className="text-primary-600 focus:ring-primary-500" 
+                        />
+                        Specific Students
+                      </label>
+                    </div>
+
+                    {assignTarget === 'class' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Classes</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {uniqueClasses.map(cls => (
+                            <label key={cls} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedClasses.includes(cls)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedClasses([...selectedClasses, cls]);
+                                  else setSelectedClasses(selectedClasses.filter(c => c !== cls));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              {cls}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {assignTarget === 'students' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1.5">Select Students</label>
+                        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                          {(myStudents || []).map(st => (
+                            <label key={st.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedStudentIds.includes(st.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, st.id]);
+                                  else setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                                }}
+                                className="text-primary-600 focus:ring-primary-500 rounded" 
+                              />
+                              <div className="truncate">
+                                <p className="leading-tight truncate">{st.name}</p>
+                                {st.className && <p className="text-[9px] text-slate-400 leading-none mt-0.5">{st.className}</p>}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-6">
+                  <button 
+                    onClick={() => {
+                      setShowAssignModal(null);
+                      setAssignTarget('all');
+                      setSelectedClasses([]);
+                      setSelectedStudentIds([]);
+                      setAssignStartTime('');
+                      setAssignEndTime('');
+                    }} 
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-50 focus:outline-none"
+                  >
+                    Cancel
+                  </button>
+                  <button onClick={() => handleAssignSubmit(showAssignModal)} className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl active:scale-95 shadow-md transition-all">Assign Now</button>
                 </div>
               </div>
             </ModalPortal>
@@ -695,6 +1247,14 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                 const theme = getCardTheme(index);
                 const hasSub = quizSubmissions.some(s => s.quizId === quiz.id);
                 const sub = quizSubmissions.find(s => s.quizId === quiz.id);
+
+                const startTimeMs = quiz.start_time ? new Date(quiz.start_time).getTime() : 0;
+                const endTimeMs = quiz.end_time ? new Date(quiz.end_time).getTime() : Infinity;
+
+                const isLocked = quiz.start_time ? currentTime < startTimeMs : false;
+                const isExpired = quiz.end_time ? currentTime > endTimeMs : false;
+                const isButtonDisabled = hasSub || isLocked || isExpired;
+
                 return (
                   <div 
                     key={quiz.id} 
@@ -712,13 +1272,13 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                           <span className={`bg-gradient-to-r ${theme.gradient} text-white px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg tracking-wider`}>
                             {quiz.subject}
                           </span>
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
-                            hasSub 
-                              ? 'bg-success-50 text-success-650 dark:bg-success-950/20 dark:text-success-400' 
-                              : 'bg-blue-50 text-blue-650 dark:bg-blue-950/20 dark:text-blue-400'
-                          }`}>
-                            {hasSub ? '✓ Submitted' : '• Open'}
-                          </span>
+                          {hasSub ? (
+                            <span className="bg-success-50 text-success-650 dark:bg-success-950/20 dark:text-success-400 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-success-200/20">
+                              ✓ Submitted
+                            </span>
+                          ) : (
+                            <LiveCountdown startTime={quiz.start_time} endTime={quiz.end_time} />
+                          )}
                         </div>
 
                         <h3 className="font-extrabold text-base text-slate-800 dark:text-white mt-4 font-outfit uppercase tracking-wide leading-tight">
@@ -755,14 +1315,17 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                       <div className="mt-5 pt-3">
                         <button
                           onClick={() => startQuiz(quiz)}
-                          disabled={hasSub}
+                          disabled={isButtonDisabled}
                           className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                            hasSub 
+                            isButtonDisabled 
                               ? 'bg-slate-50 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200/10' 
                               : 'bg-success-600 hover:bg-success-700 text-white shadow-md shadow-success-550/10 active:scale-95'
                           }`}
                         >
-                          {hasSub ? 'Evaluation Confirmed' : '▶ Start Quiz Now'}
+                          {hasSub ? 'Evaluation Confirmed' : 
+                           isLocked ? 'Locked (Starts soon)' :
+                           isExpired ? 'Expired / Closed' :
+                           '▶ Start Quiz Now'}
                         </button>
                       </div>
                     </div>
@@ -1305,6 +1868,99 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                       <button type="button" onClick={() => addQuestionField('short')} className="px-2 py-1 bg-primary-50 dark:bg-primary-950/20 text-primary-600 rounded-md text-xs font-bold hover:bg-primary-100 transition-colors flex items-center">
                         <Plus className="w-3.5 h-3.5 mr-0.5" /> Short
                       </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Active Assignment Scheduling & Targeting options in Create Modal */}
+                {!isBank && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 space-y-4 pt-4 mt-4 animate-fadeIn text-left">
+                    <h4 className="font-extrabold text-xs text-slate-700 dark:text-slate-350 uppercase tracking-wide">Assign & Schedule Settings</h4>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Assignment Date</label>
+                        <input 
+                          type="date" 
+                          value={assignDate}
+                          onChange={(e) => setAssignDate(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-800 dark:text-white focus:outline-none"
+                          required={!isBank}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Time (Optional)</label>
+                        <input 
+                          type="datetime-local" 
+                          value={assignStartTime}
+                          onChange={(e) => setAssignStartTime(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-805 dark:text-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">End Time (Optional)</label>
+                        <input 
+                          type="datetime-local" 
+                          value={assignEndTime}
+                          onChange={(e) => setAssignEndTime(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-805 dark:text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Students</label>
+                      <div className="flex flex-col sm:flex-row gap-4 mb-2">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input type="radio" name="createAssignTarget" value="all" checked={assignTarget === 'all'} onChange={() => setAssignTarget('all')} className="text-primary-600 focus:ring-primary-500" />
+                          All Students
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input type="radio" name="createAssignTarget" value="class" checked={assignTarget === 'class'} onChange={() => setAssignTarget('class')} className="text-primary-600 focus:ring-primary-500" />
+                          By Class/Standard
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input type="radio" name="createAssignTarget" value="students" checked={assignTarget === 'students'} onChange={() => setAssignTarget('students')} className="text-primary-600 focus:ring-primary-500" />
+                          Specific Students
+                        </label>
+                      </div>
+
+                      {assignTarget === 'class' && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                          <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Select Classes</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {uniqueClasses.map(cls => (
+                              <label key={cls} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                <input type="checkbox" checked={selectedClasses.includes(cls)} onChange={(e) => {
+                                  if (e.target.checked) setSelectedClasses([...selectedClasses, cls]);
+                                  else setSelectedClasses(selectedClasses.filter(c => c !== cls));
+                                }} className="text-primary-600 focus:ring-primary-500 rounded animate-fadeIn" />
+                                {cls}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {assignTarget === 'students' && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                          <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Select Students</label>
+                          <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                            {(myStudents || []).map(st => (
+                              <label key={st.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                <input type="checkbox" checked={selectedStudentIds.includes(st.id)} onChange={(e) => {
+                                  if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, st.id]);
+                                  else setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                                }} className="text-primary-600 focus:ring-primary-500 rounded animate-fadeIn" />
+                                <div className="truncate text-left">
+                                  <p className="leading-tight truncate">{st.name}</p>
+                                  {st.className && <p className="text-[9px] text-slate-405 leading-none mt-0.5">{st.className}</p>}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
