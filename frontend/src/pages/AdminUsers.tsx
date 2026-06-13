@@ -396,47 +396,31 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
         </button>
       </div>
 
-      {/* ── Tabs ── */}
-      <div className="flex flex-wrap gap-2.5">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          
-          let activeClass = "";
-          let inactiveClass = "";
-          if (tab.id === 'mentors') {
-            activeClass = "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20";
-            inactiveClass = "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-450 border-blue-105/30 hover:bg-blue-50 dark:hover:bg-blue-950/10";
-          } else if (tab.id === 'students') {
-            activeClass = "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20";
-            inactiveClass = "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-450 border-emerald-105/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/10";
-          } else {
-            activeClass = "bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 shadow-md shadow-violet-500/20";
-            inactiveClass = "bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-450 border-violet-105/30 hover:bg-violet-50 dark:hover:bg-violet-950/10";
-          }
-
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all shadow-sm border ${
-                isActive ? activeClass : inactiveClass
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
-                isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Table Container ── */}
+      {/* ── Tabs + Table ──────────────────────────────────── */}
       <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="flex border-b border-slate-200 dark:border-slate-800">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-colors border-b-2 ${
+                  isActive
+                    ? tab.color + ' border-current'
+                    : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black bg-slate-100 dark:bg-slate-800 text-slate-500">
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         <div className="overflow-x-auto">
           {isLoading ? (

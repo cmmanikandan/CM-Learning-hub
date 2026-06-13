@@ -268,24 +268,24 @@ export const TestManager: React.FC<TestManagerProps> = ({
           <div className="flex flex-wrap gap-2.5">
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm border ${
+              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
                 activeTab === 'dashboard' 
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-blue-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-blue-100/30 hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20' 
+                  : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-450 border-blue-200/50 dark:border-slate-700/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
               }`}
             >
-              <CalendarIcon className="w-3.5 h-3.5" />
+              <Calendar className="w-4 h-4" />
               Active Assignments
             </button>
             <button 
               onClick={() => setActiveTab('bank')}
-              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm border ${
+              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
                 activeTab === 'bank' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-emerald-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-emerald-100/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/10'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
+                  : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-450 border-emerald-200/50 dark:border-slate-700/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
               }`}
             >
-              <FileText className="w-3.5 h-3.5" />
+              <FileText className="w-4 h-4" />
               Test Bank
             </button>
           </div>
