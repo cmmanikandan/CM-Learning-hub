@@ -1,0 +1,21 @@
+# Dependency directories
+node_modules/
+backend/venv/
+__pycache__/
+*.pyc
+
+# Local env files
+.env
+backend/.env
+backend/firebase-adminsdk.json
+firebase-adminsdk.json
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+backend/server_log.txt
