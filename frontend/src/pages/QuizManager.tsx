@@ -15,7 +15,8 @@ import {
   Calendar,
   Trash2,
   FileText,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 
 
@@ -217,6 +218,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
 
   // Active student view states
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
+  const [isStartingQuiz, setIsStartingQuiz] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => {
@@ -333,18 +335,34 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
   }, [activeQuiz, timeLeft]);
 
   // Load auto-saved answers if student refreshes or resumes quiz
-  const startQuiz = (quiz: Quiz) => {
-    setActiveQuiz(quiz);
-    setTimeLeft(quiz.timeLimit * 60);
-    setCheatWarnings(0);
-    setQuizStartTime(Date.now());
-    
-    // Check local storage for auto-save
-    const autoSaved = localStorage.getItem(`cm_autosave_quiz_${quiz.id}`);
-    if (autoSaved) {
-      setQuizAnswers(JSON.parse(autoSaved));
-    } else {
-      setQuizAnswers({});
+  const startQuiz = async (quiz: Quiz) => {
+    setIsStartingQuiz(quiz.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/quiz/${quiz.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const fullQuiz = await res.json();
+        setActiveQuiz(fullQuiz);
+        setTimeLeft(fullQuiz.timeLimit * 60);
+        setCheatWarnings(0);
+        setQuizStartTime(Date.now());
+        
+        // Check local storage for auto-save
+        const autoSaved = localStorage.getItem(`cm_autosave_quiz_${quiz.id}`);
+        if (autoSaved) {
+          setQuizAnswers(JSON.parse(autoSaved));
+        } else {
+          setQuizAnswers({});
+        }
+      } else {
+        alert("Failed to load quiz questions. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error loading quiz questions.");
+    } finally {
+      setIsStartingQuiz(null);
     }
   };
 
@@ -1152,14 +1170,19 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                       <div className="mt-5 pt-3">
                         <button
                           onClick={() => startQuiz(quiz)}
-                          disabled={isButtonDisabled}
+                          disabled={isButtonDisabled || isStartingQuiz === quiz.id}
                           className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                            isButtonDisabled 
+                            isButtonDisabled || isStartingQuiz === quiz.id
                               ? 'bg-slate-50 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200/10' 
                               : 'bg-success-600 hover:bg-success-700 text-white shadow-md shadow-success-550/10 active:scale-95'
                           }`}
                         >
-                          {hasSub ? 'Evaluation Confirmed' : 
+                          {isStartingQuiz === quiz.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Loading...
+                            </>
+                          ) : hasSub ? 'Evaluation Confirmed' : 
                            isLocked ? 'Locked (Starts soon)' :
                            isExpired ? 'Expired / Closed' :
                            '▶ Start Quiz Now'}

@@ -332,7 +332,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
             <>
               <p className="text-sm font-extrabold font-outfit leading-tight mb-1 line-clamp-2">{nextQuiz.quizName}</p>
               <p className="text-xs text-white/70 font-semibold uppercase tracking-wider">Next Quiz</p>
-              <p className="text-xs text-white/60 mt-0.5">{nextQuiz.subject} · {nextQuiz.questions.length}Q</p>
+              <p className="text-xs text-white/60 mt-0.5">{nextQuiz.subject} · {nextQuiz.questions_count ?? nextQuiz.questions?.length ?? 0}Q</p>
               <button onClick={() => setActiveTab('quizzes')} className="mt-2 text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full transition-colors">
                 Start →
               </button>
