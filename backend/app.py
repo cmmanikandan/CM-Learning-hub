@@ -25,8 +25,8 @@ def create_app():
     if db_uri:
         from sqlalchemy import create_engine
         try:
-            # Try to connect with a short timeout
-            connect_args = {"connect_timeout": 3} if db_uri.startswith("postgresql") else {}
+            # Try to connect with a longer timeout
+            connect_args = {"connect_timeout": 15} if db_uri.startswith("postgresql") else {}
             engine = create_engine(db_uri, connect_args=connect_args)
             with engine.connect() as conn:
                 app.logger.info("Successfully connected to the remote database.")
