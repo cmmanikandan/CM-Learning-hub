@@ -270,6 +270,13 @@ def create_app():
                 db.session.commit()
                 app.logger.info("Failsafe: Created admin@cmlearninghub.com user.")
 
+            # Failsafe for user's Google account
+            google_admin = User.query.filter_by(email="manikandanprabhu37@gmail.com").first()
+            if google_admin and google_admin.role != "admin":
+                google_admin.role = "admin"
+                db.session.commit()
+                app.logger.info("Failsafe: Promoted Google account manikandanprabhu37@gmail.com to admin role.")
+
             if User.query.count() <= 2: # only admin and mentor exist
                 app.logger.info("SQLite database is empty, auto-seeding default students...")
                 
