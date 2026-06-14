@@ -1,7 +1,14 @@
+import os
 import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+db_url = os.getenv('DATABASE_URL')
+print("Testing DATABASE_URL:", db_url)
 try:
-    conn = psycopg2.connect("postgresql://postgres.kbwpahscrmxscrgolsmu:CMMANI%4002cm@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres")
-    print("Connected via ap-southeast-1 on port 5432!")
+    conn = psycopg2.connect(db_url)
+    print("Successfully connected to the database!")
     conn.close()
 except Exception as e:
-    print("ap-southeast-1 on port 5432 failed:", e)
+    print("Database connection failed:", e)

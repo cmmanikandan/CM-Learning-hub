@@ -546,7 +546,18 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
 
   const saveCreatedQuiz = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quizName || questions.some(q => !q.questionText)) return;
+    if (!quizName) {
+      alert("Please enter a quiz name.");
+      return;
+    }
+    if (questions.length === 0) {
+      alert("Please add at least one question to the quiz.");
+      return;
+    }
+    if (questions.some(q => !q.questionText)) {
+      alert("Please fill in the question text for all questions.");
+      return;
+    }
 
     let studentIds: number[] | undefined = undefined;
     if (!isBank) {

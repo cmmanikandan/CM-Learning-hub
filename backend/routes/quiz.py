@@ -127,11 +127,34 @@ def create_quiz():
     data = request.get_json() or {}
     quiz_name = data.get('quiz_name')
     subject = data.get('subject')
-    questions_data = data.get('questions', [])
+    questions_raw = data.get('questions', [])
     is_bank = data.get('is_bank', False)
     
-    if not quiz_name or not subject or not questions_data:
+    if not quiz_name or not subject or not questions_raw:
         return jsonify({"message": "Missing quiz details or questions"}), 400
+        
+    # Normalize question data to support both snake_case and camelCase
+    questions_data = []
+    for q in questions_raw:
+        q_type = q.get('question_type') or q.get('questionType') or 'mcq'
+        q_text = q.get('question_text') or q.get('questionText')
+        q_options = q.get('options')
+        q_correct = q.get('correct_answer') or q.get('correctAnswer')
+        q_expl = q.get('explanation')
+        q_marks = q.get('marks')
+        try:
+            q_marks = int(q_marks) if q_marks is not None else 1
+        except (ValueError, TypeError):
+            q_marks = 1
+            
+        questions_data.append({
+            'question_type': q_type,
+            'question_text': q_text,
+            'options': q_options,
+            'correct_answer': str(q_correct) if q_correct is not None else '',
+            'explanation': q_expl,
+            'marks': q_marks
+        })
         
     total_marks = sum(int(q.get('marks', 1)) for q in questions_data)
     
