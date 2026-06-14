@@ -29,10 +29,8 @@ def get_my_students():
         return jsonify({"message": "Unauthorized"}), 403
         
     students = User.query.filter_by(mentor_id=current_user['id']).all()
-    from routes.homework import recalculate_student_streak
     student_list = []
     for s in students:
-        recalculate_student_streak(s.id)
         student_list.append({
             "id": s.id,
             "sid": s.sid,
@@ -190,11 +188,9 @@ def get_leaderboard():
     else:
         students = User.query.filter_by(role='student').all()
         
-    from routes.homework import recalculate_student_streak
     leaderboard_data = []
     
     for s in students:
-        recalculate_student_streak(s.id)
         badge_count = len(s.achievements) if hasattr(s, 'achievements') else 0
         leaderboard_data.append({
             "id": s.id,

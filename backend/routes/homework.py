@@ -54,36 +54,46 @@ def carry_forward_pending_homework():
         Homework.date < today
     ).all()
     
-    cloned_any = False
+    if not pending_hws:
+        return
+        
+    # Map pending homework IDs to check for existing clones
+    pending_ids = [hw.id for hw in pending_hws]
+    existing_clones = Homework.query.filter(Homework.carried_from_id.in_(pending_ids)).all()
+    cloned_map = {c.carried_from_id: c for c in existing_clones}
+    
     for hw in pending_hws:
-        next_date = hw.date + timedelta(days=1)
-        # Check if already cloned
-        already_cloned = Homework.query.filter_by(carried_from_id=hw.id).first()
-        if not already_cloned:
-            # Create a clone for the next day
+        current = hw
+        # Trace the chain of existing clones to find the last one
+        while current.id in cloned_map:
+            current = cloned_map[current.id]
+            
+        # Clone forward iteratively until we reach today
+        while current.status == 'Pending' and current.date < today:
+            next_date = current.date + timedelta(days=1)
             clone = Homework(
                 date=next_date,
-                due_date=hw.due_date + timedelta(days=1) if hw.due_date else next_date,
-                subject=hw.subject,
-                homework_type=hw.homework_type,
-                title=hw.title,
-                description=hw.description,
-                priority=hw.priority,
-                estimated_time=hw.estimated_time,
-                attachment_url=hw.attachment_url,
-                remarks=hw.remarks,
+                due_date=current.due_date + timedelta(days=1) if current.due_date else next_date,
+                subject=current.subject,
+                homework_type=current.homework_type,
+                title=current.title,
+                description=current.description,
+                priority=current.priority,
+                estimated_time=current.estimated_time,
+                attachment_url=current.attachment_url,
+                remarks=current.remarks,
                 status='Pending',
-                carried_from_id=hw.id,
-                student_id=hw.student_id,
-                mentor_id=hw.mentor_id
+                carried_from_id=current.id,
+                student_id=current.student_id,
+                mentor_id=current.mentor_id
             )
             db.session.add(clone)
-            cloned_any = True
+            db.session.flush() # Flush to assign the new clone ID without committing
             
-    if cloned_any:
-        db.session.commit()
-        # Recurse to handle multiple missed days
-        carry_forward_pending_homework()
+            cloned_map[clone.carried_from_id] = clone
+            current = clone
+            
+    db.session.commit()
 
 def get_homework_chain_status(homework_id):
     hw = Homework.query.get(homework_id)
