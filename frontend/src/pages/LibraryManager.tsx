@@ -17,7 +17,8 @@ import {
   Filter,
   X,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  Folder
 } from 'lucide-react';
 
 const CARD_THEMES = [
@@ -99,6 +100,8 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
     addLibraryMaterial, 
     deleteLibraryMaterial, 
     toggleBookmarkMaterial,
+    bookmarkFolders,
+    saveBookmarkFolders,
     myStudents,
     refreshData
   } = useApp();
@@ -122,6 +125,13 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  // Tag and Folder states
+  const [selectedTag, setSelectedTag] = useState('');
+  const [selectedBookmarkFolder, setSelectedBookmarkFolder] = useState<string>('');
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [movingMaterialId, setMovingMaterialId] = useState<number | null>(null);
+
   // Target assignment states
   const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -136,6 +146,57 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
   }, [showUploadModal]);
 
   const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
+
+  const allTags = React.useMemo(() => {
+    const tagsSet = new Set<string>();
+    libraryList.forEach(m => {
+      if (Array.isArray(m.tags)) {
+        m.tags.forEach(t => {
+          const tagClean = t.trim().toLowerCase();
+          if (tagClean) tagsSet.add(tagClean);
+        });
+      }
+    });
+    return Array.from(tagsSet);
+  }, [libraryList]);
+
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    const folderName = newFolderName.trim();
+    // bookmarkFolders can be empty or null
+    const updatedFolders = { ...(bookmarkFolders || {}), [folderName]: [] };
+    const ok = await saveBookmarkFolders(updatedFolders);
+    if (ok) {
+      setNewFolderName('');
+      setShowCreateFolderModal(false);
+    }
+  };
+
+  const handleMoveToFolder = async (folderName: string, matId: number) => {
+    const updatedFolders = { ...(bookmarkFolders || {}) };
+    Object.keys(updatedFolders).forEach(f => {
+      updatedFolders[f] = updatedFolders[f].filter(id => id !== matId);
+    });
+    
+    if (folderName) {
+      if (!updatedFolders[folderName]) {
+        updatedFolders[folderName] = [];
+      }
+      updatedFolders[folderName].push(matId);
+    }
+    await saveBookmarkFolders(updatedFolders);
+    setMovingMaterialId(null);
+  };
+
+  const handleDeleteFolder = async (folderName: string) => {
+    const updatedFolders = { ...(bookmarkFolders || {}) };
+    delete updatedFolders[folderName];
+    await saveBookmarkFolders(updatedFolders);
+    if (selectedBookmarkFolder === folderName) {
+      setSelectedBookmarkFolder('');
+    }
+  };
 
   // Uploader form data
   const [formData, setFormData] = useState({
@@ -233,11 +294,18 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
   const filteredMaterials = libraryList.filter(mat => {
     const matchesSearch = mat.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           mat.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          mat.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+                          (mat.tags && mat.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
     const matchesCategory = selectedCategory ? mat.category === selectedCategory : true;
-    const matchesBookmarks = showBookmarkedOnly ? mat.isBookmarked : true;
+    const matchesBookmarks = showBookmarkedOnly 
+      ? (selectedBookmarkFolder 
+          ? (bookmarkFolders && bookmarkFolders[selectedBookmarkFolder] && bookmarkFolders[selectedBookmarkFolder].includes(mat.id))
+          : mat.isBookmarked)
+      : true;
+    const matchesTag = selectedTag 
+      ? (mat.tags && mat.tags.some(t => t.toLowerCase() === selectedTag.toLowerCase()))
+      : true;
 
-    return matchesSearch && matchesCategory && matchesBookmarks;
+    return matchesSearch && matchesCategory && matchesBookmarks && matchesTag;
   });
 
   // Group materials for mentor view to avoid duplicates
@@ -401,9 +469,14 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
         <div className="glass-panel rounded-2xl p-4 border border-slate-200/50 dark:border-slate-700/50 animate-fadeIn space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Advanced Filters</h4>
-            {activeFiltersCount > 0 && (
+            {(selectedCategory || showBookmarkedOnly || selectedTag || selectedBookmarkFolder) && (
               <button
-                onClick={() => { setSelectedCategory(''); setShowBookmarkedOnly(false); }}
+                onClick={() => { 
+                  setSelectedCategory(''); 
+                  setShowBookmarkedOnly(false); 
+                  setSelectedTag(''); 
+                  setSelectedBookmarkFolder(''); 
+                }}
                 className="text-[10px] font-bold text-danger-600 hover:underline"
               >
                 Clear All
@@ -413,7 +486,10 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             <button
-              onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
+              onClick={() => {
+                setShowBookmarkedOnly(!showBookmarkedOnly);
+                if (showBookmarkedOnly) setSelectedBookmarkFolder('');
+              }}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
                 showBookmarkedOnly
                   ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-400'
@@ -424,6 +500,27 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
               Bookmarked Only
             </button>
           </div>
+
+          {allTags.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Filter by Tag</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allTags.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                      selectedTag === tag
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:text-emerald-600'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Filter by Category</p>
@@ -447,11 +544,11 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
       )}
 
       {/* ── Active filter summary ── */}
-      {(selectedCategory || showBookmarkedOnly || searchTerm) && (
+      {(selectedCategory || showBookmarkedOnly || searchTerm || selectedTag || selectedBookmarkFolder) && (
         <div className="flex flex-wrap items-center gap-2 animate-fadeIn">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Active:</span>
           {searchTerm && (
-            <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-600 dark:text-slate-300">
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-605 dark:text-slate-300">
               🔍 "{searchTerm}"
               <button onClick={() => setSearchTerm('')}><X className="w-2.5 h-2.5" /></button>
             </span>
@@ -465,10 +562,78 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
           {showBookmarkedOnly && (
             <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 rounded-full text-[10px] font-bold text-amber-600 dark:text-amber-400">
               ⭐ Bookmarked
-              <button onClick={() => setShowBookmarkedOnly(false)}><X className="w-2.5 h-2.5" /></button>
+              <button onClick={() => { setShowBookmarkedOnly(false); setSelectedBookmarkFolder(''); }}><X className="w-2.5 h-2.5" /></button>
+            </span>
+          )}
+          {selectedTag && (
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/20 rounded-full text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              #{selectedTag}
+              <button onClick={() => setSelectedTag('')}><X className="w-2.5 h-2.5" /></button>
+            </span>
+          )}
+          {selectedBookmarkFolder && (
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 rounded-full text-[10px] font-bold text-amber-600 dark:text-amber-400">
+              📂 Folder: {selectedBookmarkFolder}
+              <button onClick={() => setSelectedBookmarkFolder('')}><X className="w-2.5 h-2.5" /></button>
             </span>
           )}
           <span className="text-[10px] text-slate-400 font-medium ml-auto">{filteredMaterials.length} result{filteredMaterials.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
+      {/* ── Bookmark Folders Sub-Navigation ── */}
+      {showBookmarkedOnly && (
+        <div className="p-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase text-slate-400 font-outfit tracking-wider">
+              Bookmark Folders
+            </span>
+            <button
+              onClick={() => setShowCreateFolderModal(true)}
+              className="text-[10px] font-bold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+            >
+              + Create Folder
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedBookmarkFolder('')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                selectedBookmarkFolder === ''
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 text-slate-650 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400 hover:text-amber-600'
+              }`}
+            >
+              📂 All Bookmarks ({bookmarkedCount})
+            </button>
+            
+            {Object.keys(bookmarkFolders || {}).map(folder => {
+              const count = (bookmarkFolders[folder] || []).length;
+              const isFolderActive = selectedBookmarkFolder === folder;
+              return (
+                <div key={folder} className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setSelectedBookmarkFolder(folder)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                      isFolderActive
+                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                        : 'bg-white dark:bg-slate-800 text-slate-655 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-405 hover:text-amber-600'
+                    }`}
+                  >
+                    📂 {folder} ({count})
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFolder(folder)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                    title="Delete folder"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -498,6 +663,56 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                       </div>
                       
                       <div className="flex items-center gap-0.5">
+                        {mat.isBookmarked && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setMovingMaterialId(movingMaterialId === mat.id ? null : mat.id)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Move to folder"
+                            >
+                              <Folder className="w-4 h-4" />
+                            </button>
+                            {movingMaterialId === mat.id && (
+                              <div className="absolute right-0 top-8 z-50 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-2 animate-scaleIn">
+                                <div className="flex items-center justify-between px-2 py-1 border-b border-slate-100 dark:border-slate-800 mb-1">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Move to Folder</span>
+                                  <button onClick={() => setMovingMaterialId(null)} className="text-slate-400 hover:text-slate-650">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="max-h-36 overflow-y-auto space-y-0.5">
+                                  <button
+                                    onClick={() => handleMoveToFolder('', mat.id)}
+                                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-300 flex items-center gap-1.5 font-semibold"
+                                  >
+                                    📂 General (No Folder)
+                                  </button>
+                                  {Object.keys(bookmarkFolders || {}).map(folder => (
+                                    <button
+                                      key={folder}
+                                      onClick={() => handleMoveToFolder(folder, mat.id)}
+                                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-300 flex items-center gap-1.5 truncate font-semibold"
+                                    >
+                                      📂 {folder}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
+                                  <button
+                                    onClick={() => {
+                                      setMovingMaterialId(null);
+                                      setShowCreateFolderModal(true);
+                                    }}
+                                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/20 font-bold flex items-center gap-1"
+                                  >
+                                    + Create New Folder
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <button
                           onClick={() => toggleBookmarkMaterial(mat.id)}
                           className={`p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
@@ -916,6 +1131,56 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* ── CREATE FOLDER MODAL ── */}
+      {showCreateFolderModal && (
+        <ModalPortal onClose={() => setShowCreateFolderModal(false)}>
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-scaleIn">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-amber-100 dark:bg-amber-950/20 rounded-lg flex items-center justify-center">
+                  <Folder className="w-4 h-4 text-amber-600" />
+                </div>
+                <h3 className="font-bold text-base text-slate-800 dark:text-white font-outfit">Create Bookmark Folder</h3>
+              </div>
+              <button onClick={() => setShowCreateFolderModal(false)} className="text-slate-400 hover:text-slate-650 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateFolder} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Folder Name</label>
+                <input 
+                  type="text" 
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-sm text-slate-800 dark:text-white focus:outline-none focus:border-primary-500 transition-colors"
+                  placeholder="e.g. Inorganic Chemistry, Reference Docs"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreateFolderModal(false)} 
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus:outline-none"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 transition-colors focus:outline-none"
+                >
+                  Create Folder
+                </button>
+              </div>
+            </form>
           </div>
         </ModalPortal>
       )}

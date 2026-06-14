@@ -51,6 +51,8 @@ def get_chat_history():
             "recipient_id": msg.recipient_id,
             "recipient_name": recipient.name if recipient else "Group Discussion",
             "content": msg.content,
+            "file_url": msg.file_url,
+            "file_name": msg.file_name,
             "is_read": msg.is_read,
             "timestamp": msg.timestamp.isoformat()
         })
@@ -81,6 +83,8 @@ def get_all_my_messages():
             "recipient_id": msg.recipient_id,
             "recipient_name": recipient.name if recipient else "Group Discussion",
             "content": msg.content,
+            "file_url": msg.file_url,
+            "file_name": msg.file_name,
             "is_read": msg.is_read,
             "timestamp": msg.timestamp.isoformat()
         })
@@ -96,14 +100,18 @@ def send_chat_message():
     data = request.get_json() or {}
     recipient_id = data.get('recipient_id')
     content = data.get('content')
+    file_url = data.get('file_url')
+    file_name = data.get('file_name')
     
-    if not content or not content.strip():
-        return jsonify({"message": "Content is required"}), 400
+    if (not content or not content.strip()) and not file_url:
+        return jsonify({"message": "Content or file is required"}), 400
         
     new_msg = ChatMessage(
         sender_id=current_user_id,
         recipient_id=recipient_id,
-        content=content.strip()
+        content=(content.strip() if content else ""),
+        file_url=file_url,
+        file_name=file_name
     )
     
     db.session.add(new_msg)
@@ -118,5 +126,7 @@ def send_chat_message():
         "sender_role": sender.role if sender else "student",
         "recipient_id": new_msg.recipient_id,
         "content": new_msg.content,
+        "file_url": new_msg.file_url,
+        "file_name": new_msg.file_name,
         "timestamp": new_msg.timestamp.isoformat()
     }), 201

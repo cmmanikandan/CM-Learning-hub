@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../config/api';
 import { ModalPortal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
@@ -16,7 +16,8 @@ import {
   Trash2,
   FileText,
   BookOpen,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 
 const mapQuizToCamelCase = (raw: any): Quiz => {
@@ -197,6 +198,34 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
   const { token } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const [viewingSubId, setViewingSubId] = useState<number | null>(null);
+  const [viewingSubDetails, setViewingSubDetails] = useState<any | null>(null);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+
+  const handleViewMistakeReport = async (subId: number) => {
+    setViewingSubId(subId);
+    setIsDetailsLoading(true);
+    setViewingSubDetails(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/quiz/submission/${subId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setViewingSubDetails(data);
+      } else {
+        alert("Failed to fetch submission details.");
+        setViewingSubId(null);
+      }
+    } catch (err) {
+      console.error("Error fetching submission details:", err);
+      alert("Error fetching submission details.");
+      setViewingSubId(null);
+    } finally {
+      setIsDetailsLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -218,6 +247,9 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+  const [isCalendarVisible, setIsCalendarVisible] = useState(true);
+  const assignDateInputRef = useRef<HTMLInputElement>(null);
+  const createDateInputRef = useRef<HTMLInputElement>(null);
 
   const groupedActiveQuizzes = React.useMemo(() => {
     // Filter active quizzes for the selected date
@@ -667,60 +699,75 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activeTab === 'dashboard' 
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-450 border-blue-200/50 dark:border-slate-700/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              Active Assignments
-            </button>
-            <button 
-              onClick={() => setActiveTab('bank')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activeTab === 'bank' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-450 border-emerald-200/50 dark:border-slate-700/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              Quiz Bank
-            </button>
+          {/* Page Tabs and Toggle Calendar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-transparent p-0 border-none shadow-none w-full">
+            <div className="flex flex-wrap gap-2.5">
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                Active Assignments
+              </button>
+              <button 
+                onClick={() => setActiveTab('bank')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activeTab === 'bank' 
+                    ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Quiz Bank
+              </button>
+            </div>
+            
+            {activeTab === 'dashboard' && (
+              <button
+                onClick={() => setIsCalendarVisible(!isCalendarVisible)}
+                className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl text-slate-755 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm active:scale-95"
+              >
+                <Calendar className="w-4 h-4 text-emerald-555" />
+                {isCalendarVisible ? 'Hide Calendar' : 'Show Calendar'}
+              </button>
+            )}
           </div>
 
           {activeTab === 'dashboard' ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Calendar Column */}
-              <div className="space-y-4">
-                <div className="glass-panel p-5 rounded-2xl flex flex-col">
-                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <Calendar className="w-4.5 h-4.5 text-primary-500" />
-                    <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
-                      Schedule Calendar
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
-                    {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {renderCalendar()}
-                  </div>
-                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
-                    <p className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
-                      Dots indicate dates with assigned quizzes.
-                    </p>
-                    <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+              {isCalendarVisible && (
+                <div className="space-y-4 transition-all duration-300">
+                  <div className="glass-panel p-5 rounded-2xl flex flex-col">
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <Calendar className="w-4.5 h-4.5 text-primary-500" />
+                      <h3 className="font-extrabold text-sm text-slate-855 dark:text-white font-outfit">
+                        Schedule Calendar
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
+                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {renderCalendar()}
+                    </div>
+                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
+                      <p className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                        Dots indicate dates with assigned quizzes.
+                      </p>
+                      <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Day's Assignments list */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className={`${isCalendarVisible ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4 transition-all duration-300`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-sm text-slate-450 uppercase tracking-wider">Scheduled Quizzes for {selectedScheduleDate}</h3>
                   <span className="text-xs font-bold text-primary-500 bg-primary-50 dark:bg-primary-950/20 px-2 py-0.5 rounded-full">{groupedActiveQuizzes.length} Quizzes</span>
@@ -928,10 +975,12 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                       <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-100 dark:border-slate-800">
                         <th className="px-4 py-3">Quiz Name</th>
                         <th className="px-4 py-3">Subject</th>
+                        {role === 'mentor' && <th className="px-4 py-3">Student</th>}
                         <th className="px-4 py-3">Score</th>
                         <th className="px-4 py-3">Accuracy</th>
                         <th className="px-4 py-3">Time Taken</th>
                         <th className="px-4 py-3">Date Submitted</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
@@ -940,15 +989,26 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                           <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                             <td className="px-4 py-3 font-bold text-slate-800 dark:text-white font-outfit">{sub.quizName}</td>
                             <td className="px-4 py-3 font-semibold text-xs text-primary-650">{sub.subject}</td>
+                            {role === 'mentor' && (
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-350">{sub.studentName || 'Student'}</td>
+                            )}
                             <td className="px-4 py-3 font-extrabold">{sub.score} / {sub.totalMarks}</td>
                             <td className="px-4 py-3 font-extrabold text-success-600">{sub.accuracy.toFixed(0)}%</td>
                             <td className="px-4 py-3 font-medium text-xs">{Math.floor(sub.timeTaken / 60)}m {sub.timeTaken % 60}s</td>
                             <td className="px-4 py-3 text-xs text-slate-400">{new Date(sub.submittedAt).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => handleViewMistakeReport(sub.id)}
+                                className="px-2.5 py-1 text-xs bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 hover:text-indigo-750 rounded-lg font-bold transition-all active:scale-95"
+                              >
+                                Mistake Report
+                              </button>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-6 text-slate-400">No submissions recorded yet.</td>
+                          <td colSpan={role === 'mentor' ? 8 : 7} className="text-center py-6 text-slate-400">No submissions recorded yet.</td>
                         </tr>
                       )}
                     </tbody>
@@ -974,13 +1034,20 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Assignment Date</label>
-                    <input 
-                      type="date" 
-                      value={assignDate}
-                      onChange={(e) => setAssignDate(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                      required
-                    />
+                    <div className="relative flex items-center">
+                      <input 
+                        type="date" 
+                        ref={assignDateInputRef}
+                        value={assignDate}
+                        onChange={(e) => setAssignDate(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2.5 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                        required
+                      />
+                      <Calendar 
+                        className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                        onClick={() => assignDateInputRef.current?.showPicker()}
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1828,13 +1895,20 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Assignment Date</label>
-                        <input 
-                          type="date" 
-                          value={assignDate}
-                          onChange={(e) => setAssignDate(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-800 dark:text-white focus:outline-none"
-                          required={!isBank}
-                        />
+                        <div className="relative flex items-center">
+                          <input 
+                            type="date" 
+                            ref={createDateInputRef}
+                            value={assignDate}
+                            onChange={(e) => setAssignDate(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-1.5 rounded-lg text-xs text-slate-800 dark:text-white focus:outline-none"
+                            required={!isBank}
+                          />
+                          <Calendar 
+                            className="absolute right-2 text-slate-400 w-3.5 h-3.5 cursor-pointer hover:text-primary-505 transition-colors"
+                            onClick={() => createDateInputRef.current?.showPicker()}
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Start Time (Optional)</label>
@@ -2028,6 +2102,177 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                 className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all"
               >
                 Close Preview
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Mistake Report Modal */}
+      {viewingSubId !== null && (
+        <ModalPortal onClose={() => setViewingSubId(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl border border-slate-100 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[85vh] animate-scaleIn space-y-4">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-extrabold text-lg text-slate-800 dark:text-white font-outfit">
+                  Mistake Report
+                </h3>
+                <p className="text-xs text-slate-400 font-bold mt-0.5">
+                  Detailed question-by-question analysis
+                </p>
+              </div>
+              <button 
+                onClick={() => setViewingSubId(null)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {isDetailsLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
+                <span className="text-xs font-bold font-outfit">Loading mistake report...</span>
+              </div>
+            ) : viewingSubDetails ? (
+              <div className="space-y-4">
+                
+                {/* Stats Overview */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/40 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Student</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mt-1 truncate">{viewingSubDetails.student_name}</p>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Score</p>
+                    <p className="text-sm font-extrabold text-slate-800 dark:text-white mt-1">
+                      {viewingSubDetails.score} / {viewingSubDetails.total_marks}
+                    </p>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Accuracy</p>
+                    <p className={`text-sm font-extrabold mt-1 ${viewingSubDetails.accuracy >= 70 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                      {viewingSubDetails.accuracy.toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Time Taken</p>
+                    <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mt-1">
+                      {Math.floor(viewingSubDetails.time_taken / 60)}m {viewingSubDetails.time_taken % 60}s
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sub-areas feedback if any */}
+                {(viewingSubDetails.strong_areas || viewingSubDetails.weak_areas) && (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {viewingSubDetails.strong_areas && (
+                      <div className="flex-1 bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100/30 p-3 rounded-xl">
+                        <span className="text-[9px] font-black uppercase text-emerald-600 tracking-wider">💪 Strong Areas</span>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">{viewingSubDetails.strong_areas}</p>
+                      </div>
+                    )}
+                    {viewingSubDetails.weak_areas && (
+                      <div className="flex-1 bg-rose-50/30 dark:bg-rose-950/10 border border-rose-100/30 p-3 rounded-xl">
+                        <span className="text-[9px] font-black uppercase text-rose-600 tracking-wider">⚠️ Focus Areas</span>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">{viewingSubDetails.weak_areas}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Question Details List */}
+                <div className="space-y-3.5 max-h-[45vh] overflow-y-auto pr-1">
+                  {viewingSubDetails.questions && viewingSubDetails.questions.map((q: any, idx: number) => (
+                    <div 
+                      key={q.id} 
+                      className={`p-4 rounded-2xl border transition-all ${
+                        q.is_correct 
+                          ? 'bg-emerald-50/10 border-emerald-100/50 dark:border-emerald-900/20' 
+                          : 'bg-rose-50/10 border-rose-100/50 dark:border-rose-900/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <span className="text-[10px] font-bold text-slate-405">Question {idx + 1} ({q.question_type.toUpperCase()})</span>
+                          <p className="font-semibold text-slate-800 dark:text-white mt-1 leading-snug">{q.question_text}</p>
+                        </div>
+                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase shrink-0 ${
+                          q.is_correct 
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                            : 'bg-rose-100 text-rose-650 dark:bg-rose-900/30 dark:text-rose-405'
+                        }`}>
+                          {q.is_correct ? 'Correct' : 'Incorrect'}
+                        </span>
+                      </div>
+
+                      {/* Options rendering for MCQ / TF */}
+                      {Array.isArray(q.options) && q.options.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                          {q.options.map((opt: string) => {
+                            const isChosen = String(q.student_answer).trim() === opt.trim();
+                            const isCorrectOpt = String(q.correct_answer).trim() === opt.trim();
+                            
+                            let optClass = "border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400";
+                            if (isCorrectOpt) {
+                              optClass = "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-bold";
+                            } else if (isChosen) {
+                              optClass = "border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 font-bold";
+                            }
+                            
+                            return (
+                              <div key={opt} className={`px-3 py-2 border rounded-xl text-xs flex items-center justify-between ${optClass}`}>
+                                <span>{opt}</span>
+                                {isCorrectOpt && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold">✓ Correct</span>}
+                                {isChosen && !isCorrectOpt && <span className="text-[10px] text-rose-600 dark:text-rose-450 font-extrabold">✕ Chosen</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Answers for non-MCQ */}
+                      {(!Array.isArray(q.options) || q.options.length === 0) && (
+                        <div className="mt-3.5 space-y-2 p-3 bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/50 rounded-xl">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-semibold">Student's Answer:</span>
+                            <span className={`font-bold ${q.is_correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-650'}`}>
+                              {String(q.student_answer) || '(blank)'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-slate-100 dark:border-slate-800/50 pt-2">
+                            <span className="text-slate-400 font-semibold">Correct Answer:</span>
+                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                              {q.correct_answer}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Explanation */}
+                      {q.explanation && (
+                        <div className="mt-3 text-[11px] leading-relaxed text-slate-500 bg-slate-50 dark:bg-slate-800/40 dark:text-slate-400 p-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                          <span className="font-extrabold text-slate-700 dark:text-slate-300">Explanation:</span> {q.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+              </div>
+            ) : (
+              <div className="py-10 text-center text-slate-400">Failed to load submission report.</div>
+            )}
+            
+            {/* Close Button */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button 
+                onClick={() => setViewingSubId(null)}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+              >
+                Close Report
               </button>
             </div>
           </div>

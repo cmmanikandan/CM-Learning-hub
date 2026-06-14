@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 	streak INTEGER NOT NULL DEFAULT 0,
 	mentor_notes TEXT,
 	bookmarked_material_ids TEXT,
+	bookmark_folders TEXT,
 	assigned_date DATE,
 	PRIMARY KEY (id), 
 	UNIQUE (username), 
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS streak INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mentor_notes TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bookmarked_material_ids TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bookmark_folders TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_date DATE;
 
 
@@ -230,7 +232,9 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 	id SERIAL NOT NULL,
 	sender_id INTEGER NOT NULL,
 	recipient_id INTEGER,
-	content TEXT NOT NULL,
+	content TEXT,
+	file_url VARCHAR(256),
+	file_name VARCHAR(256),
 	is_read BOOLEAN NOT NULL DEFAULT FALSE,
 	timestamp TIMESTAMP WITHOUT TIME ZONE,
 	PRIMARY KEY (id),

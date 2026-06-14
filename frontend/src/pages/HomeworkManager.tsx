@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ModalPortal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import type { Homework } from '../context/AppContext';
@@ -65,6 +65,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+  const [isCalendarVisible, setIsCalendarVisible] = useState(true);
+  const assignDateRef = useRef<HTMLInputElement>(null);
 
 
   const renderCalendar = () => {
@@ -484,59 +486,73 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
             </div>
           </div>
 
-          {/* Page Tabs */}
-          <div className="flex flex-wrap gap-2.5">
-            <button
-              onClick={() => setActivePageTab('today')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activePageTab === 'today'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500 shadow-md shadow-blue-500/20'
-                  : 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 border-blue-200/50 dark:border-slate-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
-              }`}
-            >
-              <CalendarIcon className="w-4 h-4" />
-              Today's Schedule & Calendar
-            </button>
-            <button
-              onClick={() => setActivePageTab('history')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activePageTab === 'history'
-                  ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-purple-500 shadow-md shadow-purple-550/20'
-                  : 'bg-white dark:bg-slate-800 text-purple-650 dark:text-purple-400 border-purple-200/50 dark:border-slate-700 hover:bg-purple-50/50 dark:hover:bg-purple-950/10'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Homework History
-            </button>
+          {/* Page Tabs and Toggle Calendar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-transparent p-0 border-none shadow-none">
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={() => setActivePageTab('today')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activePageTab === 'today'
+                    ? 'bg-emerald-500 border-emerald-500 text-white'
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <CalendarIcon className="w-4 h-4" />
+                Today's Schedule & Calendar
+              </button>
+              <button
+                onClick={() => setActivePageTab('history')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activePageTab === 'history'
+                    ? 'bg-emerald-500 border-emerald-500 text-white'
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Homework History
+              </button>
+            </div>
+            
+            {activePageTab === 'today' && (
+              <button
+                onClick={() => setIsCalendarVisible(!isCalendarVisible)}
+                className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl text-slate-750 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm active:scale-95"
+              >
+                <CalendarIcon className="w-4 h-4 text-emerald-555" />
+                {isCalendarVisible ? 'Hide Calendar' : 'Show Calendar'}
+              </button>
+            )}
           </div>
 
           {activePageTab === 'today' ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Calendar Column */}
-              <div className="glass-panel p-5 rounded-2xl flex flex-col">
-                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <CalendarIcon className="w-4.5 h-4.5 text-primary-500" />
-                  <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
-                    Schedule Calendar
-                  </h3>
+              {isCalendarVisible && (
+                <div className="glass-panel p-5 rounded-2xl flex flex-col transition-all duration-300">
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <CalendarIcon className="w-4.5 h-4.5 text-primary-500" />
+                    <h3 className="font-extrabold text-sm text-slate-855 dark:text-white font-outfit">
+                      Schedule Calendar
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
+                    {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {renderCalendar()}
+                  </div>
+                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
+                    <p className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                      Dots indicate dates with assigned homework.
+                    </p>
+                    <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase mb-2">
-                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
-                </div>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {renderCalendar()}
-                </div>
-                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
-                  <p className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
-                    Dots indicate dates with assigned homework.
-                  </p>
-                  <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
-                </div>
-              </div>
+              )}
 
               {/* Day Assignments Column */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className={`${isCalendarVisible ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6 transition-all duration-300`}>
                 <div className="glass-panel p-5 rounded-2xl flex flex-col">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <h3 className="font-bold text-base text-slate-800 dark:text-white font-outfit">
@@ -615,14 +631,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
                             <button
                               onClick={() => duplicateHomework(hw.id)}
                               className="p-2 text-slate-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/20 rounded-lg transition-all"
-                              title="Duplicate"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => deleteHomework(hw.id)}
                               className="p-2 text-slate-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 rounded-lg transition-all"
-                              title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -764,21 +778,18 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
                                 <button 
                                   onClick={() => startEdit(hw)}
                                   className="p-1.5 text-slate-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 rounded-lg transition-colors"
-                                  title="Edit"
                                 >
                                   <Edit3 className="w-4 h-4" />
                                 </button>
                                 <button 
                                   onClick={() => duplicateHomework(hw.id)}
                                   className="p-1.5 text-slate-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/20 rounded-lg transition-colors"
-                                  title="Duplicate"
                                 >
                                   <Copy className="w-4 h-4" />
                                 </button>
                                 <button 
                                   onClick={() => deleteHomework(hw.id)}
                                   className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/20 rounded-lg transition-colors"
-                                  title="Delete"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -948,13 +959,20 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Date</label>
-                  <input 
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none focus:border-primary-500"
-                    required
-                  />
+                  <div className="relative flex items-center">
+                    <input 
+                      type="date"
+                      ref={assignDateRef}
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-lg text-sm text-slate-850 dark:text-white focus:outline-none focus:border-primary-500"
+                      required
+                    />
+                    <CalendarIcon 
+                      className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                      onClick={() => assignDateRef.current?.showPicker()}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Homework Type</label>

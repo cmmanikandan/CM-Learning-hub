@@ -31,6 +31,7 @@ class User(db.Model):
     streak = db.Column(db.Integer, nullable=False, default=0)
     mentor_notes = db.Column(db.Text, nullable=True)
     bookmarked_material_ids = db.Column(db.Text, nullable=True)
+    bookmark_folders = db.Column(db.Text, nullable=True)
     assigned_date = db.Column(db.Date, nullable=True)
     
     submissions = db.relationship('QuizSubmission', backref='student', lazy=True)
@@ -188,7 +189,9 @@ class ChatMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     recipient_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    file_url = db.Column(db.String(256), nullable=True)
+    file_name = db.Column(db.String(256), nullable=True)
     is_read = db.Column(db.Boolean, default=False, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 

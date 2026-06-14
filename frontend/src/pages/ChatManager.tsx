@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { MessageSquare, Send, User, Users, ArrowLeft, Search, Circle } from 'lucide-react';
+import { MessageSquare, Send, User, Users, ArrowLeft, Search, Circle, Paperclip, File, FileText, Image as ImageIcon, X, Loader2 } from 'lucide-react';
+import { uploadToCloudinary, getCloudinaryDownloadUrl } from '../utils/cloudinary';
 
 export const ChatManager: React.FC = () => {
   const { 
@@ -22,6 +23,12 @@ export const ChatManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // File upload states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [attachedFile, setAttachedFile] = useState<{ url: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Poll chat messages every 4s
   useEffect(() => {
@@ -42,13 +49,38 @@ export const ChatManager: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      const url = await uploadToCloudinary(file, (progress) => {
+        setUploadProgress(progress);
+      });
+      setAttachedFile({ url, name: file.name });
+    } catch (err: any) {
+      console.error("Failed to upload file to Chat:", err);
+      alert("Failed to upload file. Error: " + (err.message || err));
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !attachedFile) return;
     try {
       setIsSending(true);
-      await sendChatMessage(selectedRecipient?.id ?? null, inputText.trim());
+      await sendChatMessage(
+        selectedRecipient?.id ?? null, 
+        inputText.trim(), 
+        attachedFile?.url ?? undefined, 
+        attachedFile?.name ?? undefined
+      );
       setInputText('');
+      setAttachedFile(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -289,7 +321,42 @@ export const ChatManager: React.FC = () => {
                           ? 'bg-primary-600 text-white rounded-tr-sm shadow-sm shadow-primary-500/20'
                           : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 rounded-tl-sm shadow-sm'
                       }`}>
-                        <div>{msg.content}</div>
+                        {msg.file_url && msg.file_url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) && (
+                          <div className="mb-1.5 mt-0.5">
+                            <img 
+                              src={msg.file_url} 
+                              alt={msg.file_name || "attachment"} 
+                              className="max-w-full sm:max-w-sm max-h-48 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(msg.file_url, '_blank')}
+                            />
+                          </div>
+                        )}
+                        {msg.file_url && !msg.file_url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) && (
+                          <div className="mb-1.5 mt-0.5">
+                            <a 
+                              href={getCloudinaryDownloadUrl(msg.file_url)} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className={`flex items-center space-x-2 p-2 rounded-xl border text-xs font-bold transition-all ${
+                                isOwn 
+                                  ? 'bg-primary-750/40 hover:bg-primary-700/80 border-primary-500 text-white' 
+                                  : 'bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                              }`}
+                            >
+                              {msg.file_name?.match(/\.pdf$/i) ? (
+                                <FileText className="w-4 h-4 text-red-500 shrink-0" />
+                              ) : (
+                                <File className="w-4 h-4 text-indigo-500 shrink-0" />
+                              )}
+                              <span className="truncate flex-1 max-w-[150px] sm:max-w-[200px]" title={msg.file_name}>
+                                {msg.file_name || "Attachment"}
+                              </span>
+                            </a>
+                          </div>
+                        )}
+                        {msg.content && msg.content.trim() && (
+                          <div className="font-medium text-xs sm:text-sm">{msg.content}</div>
+                        )}
                         <div className={`text-[9px] mt-1 flex items-center justify-end gap-1 select-none leading-none ${isOwn ? 'text-white/70' : 'text-slate-400'}`}>
                           <span>
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -313,29 +380,87 @@ export const ChatManager: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Box */}
-      <form
-        onSubmit={handleSendMessage}
-        className="px-3 sm:px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-end gap-2.5 shrink-0"
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          placeholder={`Message ${selectedRecipient === null ? 'group' : selectedRecipient.name}...`}
-          className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-2xl text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-primary-500 transition-colors resize-none"
-          disabled={isSending}
-          autoComplete="off"
-        />
-        <button
-          type="submit"
-          disabled={isSending || !inputText.trim()}
-          className="w-11 h-11 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl shadow-md shadow-primary-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0"
+      {/* Input Box Wrapper */}
+      <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+        {/* Upload Progress Bar */}
+        {isUploading && (
+          <div className="px-4 py-1.5 bg-primary-50/50 dark:bg-primary-950/10 border-b border-primary-100/30 flex items-center justify-between text-[10px] font-bold text-primary-600 dark:text-primary-400">
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading file...
+            </span>
+            <span>{uploadProgress}%</span>
+            <div className="absolute top-0 left-0 h-0.5 bg-primary-500 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+          </div>
+        )}
+
+        {/* Attached File Preview Card */}
+        {attachedFile && (
+          <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between animate-fadeIn">
+            <div className="flex items-center gap-2 max-w-[85%]">
+              {attachedFile.name.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) ? (
+                <ImageIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+              ) : attachedFile.name.match(/\.pdf$/i) ? (
+                <FileText className="w-4 h-4 text-red-500 shrink-0" />
+              ) : (
+                <File className="w-4 h-4 text-indigo-500 shrink-0" />
+              )}
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate font-outfit">
+                {attachedFile.name}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachedFile(null)}
+              className="p-1 rounded-lg text-slate-450 hover:text-danger-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              title="Remove file"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSendMessage}
+          className="px-3 sm:px-4 py-3 flex items-end gap-2.5"
         >
-          <Send className="w-4.5 h-4.5" />
-        </button>
-      </form>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSending || isUploading}
+            className="w-11 h-11 bg-slate-50 hover:bg-slate-105 dark:bg-slate-800 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-2xl flex items-center justify-center shrink-0 transition-colors active:scale-95 disabled:opacity-50"
+            title="Attach file"
+          >
+            {isUploading ? (
+              <Loader2 className="w-4.5 h-4.5 animate-spin" />
+            ) : (
+              <Paperclip className="w-4.5 h-4.5" />
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            placeholder={attachedFile ? "Add a message or press send..." : `Message ${selectedRecipient === null ? 'group' : selectedRecipient.name}...`}
+            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-2xl text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-primary-500 transition-colors resize-none"
+            disabled={isSending || isUploading}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={isSending || isUploading || (!inputText.trim() && !attachedFile)}
+            className="w-11 h-11 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl shadow-md shadow-primary-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0"
+          >
+            <Send className="w-4.5 h-4.5" />
+          </button>
+        </form>
+      </div>
     </div>
   );
 

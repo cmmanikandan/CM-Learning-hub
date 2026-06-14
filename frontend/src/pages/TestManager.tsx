@@ -231,6 +231,11 @@ export const TestManager: React.FC<TestManagerProps> = ({
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+  const [isCalendarVisible, setIsCalendarVisible] = useState(true);
+  const assignStartRef = useRef<HTMLInputElement>(null);
+  const assignEndRef = useRef<HTMLInputElement>(null);
+  const createStartRef = useRef<HTMLInputElement>(null);
+  const createEndRef = useRef<HTMLInputElement>(null);
 
 
   // Form states for test creation
@@ -513,40 +518,54 @@ export const TestManager: React.FC<TestManagerProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activeTab === 'dashboard' 
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-500 shadow-md shadow-blue-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 border-blue-200/50 dark:border-slate-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Active Assignments
-            </button>
-            <button 
-              onClick={() => setActiveTab('bank')}
-              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-sm border ${
-                activeTab === 'bank' 
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md shadow-amber-500/20' 
-                  : 'bg-white dark:bg-slate-800 text-amber-655 dark:text-amber-450 border-amber-200/50 dark:border-slate-700 hover:bg-amber-50/50 dark:hover:bg-amber-950/10'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Test Bank
-            </button>
+          {/* Page Tabs and Toggle Calendar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-transparent p-0 border-none shadow-none w-full">
+            <div className="flex flex-wrap gap-2.5">
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                Active Assignments
+              </button>
+              <button 
+                onClick={() => setActiveTab('bank')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-full transition-all border shadow-sm ${
+                  activeTab === 'bank' 
+                    ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Test Bank
+              </button>
+            </div>
+            
+            {activeTab === 'dashboard' && (
+              <button
+                onClick={() => setIsCalendarVisible(!isCalendarVisible)}
+                className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl text-slate-755 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm active:scale-95"
+              >
+                <Calendar className="w-4 h-4 text-emerald-555" />
+                {isCalendarVisible ? 'Hide Calendar' : 'Show Calendar'}
+              </button>
+            )}
           </div>
 
           {activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Calendar Column */}
-                <div className="space-y-4">
+              {/* Calendar Column */}
+              {isCalendarVisible && (
+                <div className="space-y-4 transition-all duration-300">
                   <div className="glass-panel p-5 rounded-2xl flex flex-col">
                     <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                       <Calendar className="w-4.5 h-4.5 text-primary-500" />
-                      <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
+                      <h3 className="font-extrabold text-sm text-slate-855 dark:text-white font-outfit">
                         Schedule Calendar
                       </h3>
                     </div>
@@ -556,18 +575,19 @@ export const TestManager: React.FC<TestManagerProps> = ({
                     <div className="grid grid-cols-7 gap-1.5">
                       {renderCalendar()}
                     </div>
-                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-555 dark:text-slate-400 font-semibold space-y-1.5">
+                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-550 dark:text-slate-400 font-semibold space-y-1.5">
                       <p className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
                         Dots indicate dates with assigned tests.
                       </p>
                       <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
                     </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-                {/* Day's Assignments list */}
-                <div className="lg:col-span-2 space-y-4">
+              {/* Day's Assignments list */}
+              <div className={`${isCalendarVisible ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4 transition-all duration-300`}>
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm text-slate-455 uppercase tracking-wider font-outfit">Scheduled Tests for {selectedScheduleDate}</h3>
                     <span className="text-xs font-bold text-primary-500 bg-primary-50 dark:bg-primary-950/20 px-2.5 py-0.5 rounded-full">{groupedActiveTests.length} Tests</span>
@@ -833,23 +853,37 @@ export const TestManager: React.FC<TestManagerProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Date & Time</label>
-                      <input 
-                        type="datetime-local" 
-                        value={assignStartDate}
-                        onChange={(e) => setAssignStartDate(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
-                        required
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="datetime-local" 
+                          ref={assignStartRef}
+                          value={assignStartDate}
+                          onChange={(e) => setAssignStartDate(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                          required
+                        />
+                        <Calendar 
+                          className="absolute right-2 text-slate-400 w-4 h-4 cursor-pointer hover:text-primary-500 transition-colors"
+                          onClick={() => assignStartRef.current?.showPicker()}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Date & Time</label>
-                      <input 
-                        type="datetime-local" 
-                        value={assignEndDate}
-                        onChange={(e) => setAssignEndDate(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
-                        required
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="datetime-local" 
+                          ref={assignEndRef}
+                          value={assignEndDate}
+                          onChange={(e) => setAssignEndDate(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-2.5 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none"
+                          required
+                        />
+                        <Calendar 
+                          className="absolute right-2 text-slate-400 w-4 h-4 cursor-pointer hover:text-primary-500 transition-colors"
+                          onClick={() => assignEndRef.current?.showPicker()}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1396,11 +1430,37 @@ export const TestManager: React.FC<TestManagerProps> = ({
                   <div className="grid grid-cols-2 gap-4 animate-fadeIn">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Start Date & Time</label>
-                      <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white" required />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="datetime-local" 
+                          ref={createStartRef}
+                          value={startDate} 
+                          onChange={(e) => setStartDate(e.target.value)} 
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-2 rounded-lg text-xs text-slate-800 dark:text-white" 
+                          required 
+                        />
+                        <Calendar 
+                          className="absolute right-2 text-slate-400 w-4 h-4 cursor-pointer hover:text-primary-505 transition-colors"
+                          onClick={() => createStartRef.current?.showPicker()}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">End Date & Time</label>
-                      <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-white" required />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="datetime-local" 
+                          ref={createEndRef}
+                          value={endDate} 
+                          onChange={(e) => setEndDate(e.target.value)} 
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-2 rounded-lg text-xs text-slate-800 dark:text-white" 
+                          required 
+                        />
+                        <Calendar 
+                          className="absolute right-2 text-slate-400 w-4 h-4 cursor-pointer hover:text-primary-505 transition-colors"
+                          onClick={() => createEndRef.current?.showPicker()}
+                        />
+                      </div>
                     </div>
                   </div>
 

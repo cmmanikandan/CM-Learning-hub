@@ -69,9 +69,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
   const [selectedMentor, setSelectedMentor] = useState<number | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [selectedLeaderboardClass, setSelectedLeaderboardClass] = useState<string>('');
+
   useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+    fetchLeaderboard(selectedLeaderboardClass);
+  }, [selectedLeaderboardClass]);
 
   useEffect(() => {
     const randomIdx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
@@ -115,6 +117,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
   // Homework calculations
   const todayStr = new Date().toISOString().split('T')[0];
   const pendingHwList = homeworkList.filter(hw => hw.status === 'Pending');
+  const tomorrowStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  })();
+  const dueTomorrowHw = pendingHwList.filter(hw => hw.dueDate === tomorrowStr);
+  const dueTodayOrOverdueHw = pendingHwList.filter(hw => hw.dueDate && hw.dueDate <= todayStr);
   const todaysHwList = homeworkList.filter(hw => hw.date === todayStr);
   const completedHwCount = homeworkList.filter(hw => hw.date === todayStr && hw.status === 'Completed').length;
   
@@ -256,6 +265,38 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
             <p className="text-sm font-bold text-orange-700 dark:text-orange-400">You were marked Absent yesterday ({yesterdayStr})</p>
             <p className="text-xs text-orange-600/70 dark:text-orange-500/70 mt-0.5">Please check with your mentor if this was a mistake.</p>
           </div>
+        </div>
+      )}
+
+      {/* ── Automated Homework Reminder Banner ── */}
+      {(dueTomorrowHw.length > 0 || dueTodayOrOverdueHw.length > 0) && (
+        <div className="p-4 bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-400/20 dark:border-rose-900/30 rounded-2xl flex items-start justify-between gap-3 animate-fadeIn flex-wrap sm:flex-nowrap">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-rose-100 dark:bg-rose-950/30 rounded-xl flex items-center justify-center shrink-0 animate-pulse">
+              <Clock className="w-5 h-5 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-rose-700 dark:text-rose-400 font-outfit">Pending Homework Alert!</p>
+              <div className="text-xs text-slate-650 dark:text-slate-400 mt-1 space-y-0.5">
+                {dueTodayOrOverdueHw.length > 0 && (
+                  <p className="font-semibold text-rose-600 dark:text-rose-500">
+                    ⚠️ You have {dueTodayOrOverdueHw.length} task(s) overdue or due today!
+                  </p>
+                )}
+                {dueTomorrowHw.length > 0 && (
+                  <p className="font-semibold text-amber-600 dark:text-amber-500">
+                    ⏰ You have {dueTomorrowHw.length} task(s) due tomorrow!
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('homework')}
+            className="px-4 py-2 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-700 hover:to-amber-605 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 shrink-0 self-center"
+          >
+            Resolve Tasks
+          </button>
         </div>
       )}
 
@@ -517,13 +558,25 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
 
           {/* Streak Leaderboard Widget */}
           <div className="glass-panel p-5 rounded-2xl">
-            <div className="flex items-center space-x-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <h3 className="font-bold text-sm text-slate-800 dark:text-white font-outfit">Streak Leaderboard</h3>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3 flex-wrap gap-2">
+              <div className="flex items-center space-x-2">
+                <Flame className="w-5 h-5 text-orange-500" />
+                <h3 className="font-bold text-sm text-slate-800 dark:text-white font-outfit">Streak Leaderboard</h3>
+              </div>
+              <select
+                value={selectedLeaderboardClass}
+                onChange={(e) => setSelectedLeaderboardClass(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">All Grades</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="Grade 11">Grade 11</option>
+                <option value="Grade 12">Grade 12</option>
+              </select>
             </div>
             <div className="space-y-2.5">
               {leaderboard.slice(0, 5).map((student, idx) => {
-                const isSelf = student.id === studentProfile.id;
+                const isSelf = student.id === studentProfile?.id;
                 return (
                   <div key={student.id} className={`flex items-center justify-between p-2 rounded-xl text-xs ${isSelf ? 'bg-orange-50 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-900/30' : ''}`}>
                     <div className="flex items-center space-x-2.5">
@@ -533,17 +586,33 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
                         alt={student.name} 
                         className="w-7 h-7 rounded-lg object-cover ring-1 ring-slate-150"
                       />
-                      <span className={`font-bold ${isSelf ? 'text-orange-700 dark:text-orange-300 font-extrabold' : 'text-slate-650 dark:text-slate-300'}`}>
-                        {student.name} {isSelf && '(You)'}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className={`font-bold ${isSelf ? 'text-orange-700 dark:text-orange-300 font-extrabold' : 'text-slate-650 dark:text-slate-300'}`}>
+                          {student.name} {isSelf && '(You)'}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-medium">
+                          {student.class_name || 'Grade 10'} · {student.section || 'A'}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-extrabold flex items-center text-orange-600 dark:text-orange-400">
-                      <Flame className="w-3.5 h-3.5 mr-0.5 fill-current" />
-                      {isSelf ? streakDays : student.streak}d
-                    </span>
+                    <div className="flex items-center space-x-2.5">
+                      <span className="font-extrabold flex items-center text-orange-600 dark:text-orange-400" title="Streak">
+                        <Flame className="w-3.5 h-3.5 mr-0.5 fill-current" />
+                        {isSelf ? streakDays : student.streak}d
+                      </span>
+                      {student.badge_count > 0 && (
+                        <span className="font-extrabold flex items-center text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded-md text-[10px]" title={`${student.badge_count} Achievements`}>
+                          <Trophy className="w-3 h-3 mr-0.5 fill-current" />
+                          {student.badge_count}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
+              {leaderboard.length === 0 && (
+                <div className="text-center py-4 text-slate-450 text-xs">No active students in this grade.</div>
+              )}
             </div>
           </div>
 

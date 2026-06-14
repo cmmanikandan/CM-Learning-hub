@@ -65,6 +65,23 @@ def update_mentor_notes(student_id):
     
     return jsonify({"message": "Notes updated successfully", "mentor_notes": notes}), 200
 
+@users_bp.route('/<int:student_id>/remove-student', methods=['POST'])
+@jwt_required()
+def remove_student(student_id):
+    current_user = json.loads(get_jwt_identity())
+    if current_user['role'] != 'mentor':
+        return jsonify({"message": "Unauthorized"}), 403
+        
+    student = User.query.filter_by(id=student_id, mentor_id=current_user['id']).first()
+    if not student:
+        return jsonify({"message": "Student not found or not assigned to you"}), 404
+        
+    student.mentor_id = None
+    student.assigned_date = None
+    db.session.commit()
+    
+    return jsonify({"message": "Student removed successfully"}), 200
+
 @users_bp.route('/change-mentor', methods=['POST'])
 @jwt_required()
 def change_mentor():
@@ -167,19 +184,27 @@ def upload_photo():
 @users_bp.route('/leaderboard', methods=['GET'])
 @jwt_required()
 def get_leaderboard():
-    students = User.query.filter_by(role='student').all()
+    class_name = request.args.get('class_name')
+    if class_name:
+        students = User.query.filter_by(role='student', class_name=class_name).all()
+    else:
+        students = User.query.filter_by(role='student').all()
+        
     from routes.homework import recalculate_student_streak
     leaderboard_data = []
     
     for s in students:
         recalculate_student_streak(s.id)
+        badge_count = len(s.achievements) if hasattr(s, 'achievements') else 0
         leaderboard_data.append({
             "id": s.id,
             "name": s.name,
             "class_name": s.class_name or "Grade 10",
             "section": s.section or "A",
             "photo_url": s.photo_url,
-            "streak": s.streak
+            "streak": s.streak,
+            "badge_count": badge_count,
+            "achievements": [{"name": a.name, "description": a.description} for a in s.achievements] if hasattr(s, 'achievements') else []
         })
         
     leaderboard_data.sort(key=lambda x: x['streak'], reverse=True)

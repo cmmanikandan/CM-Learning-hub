@@ -860,6 +860,75 @@ def delete_quiz(quiz_id):
     db.session.commit()
     return jsonify({"message": "Quiz deleted successfully"}), 200
 
+@quiz_bp.route('/submission/<int:sub_id>', methods=['GET'])
+@jwt_required()
+def get_submission_details(sub_id):
+    identity = json.loads(get_jwt_identity())
+    sub = QuizSubmission.query.get(sub_id)
+    if not sub:
+        return jsonify({"message": "Submission not found"}), 404
+        
+    # Check authorization (mentor can see their student's submission, student can see their own)
+    if identity['role'] == 'student' and sub.student_id != identity['id']:
+        return jsonify({"message": "Unauthorized"}), 403
+    elif identity['role'] == 'mentor':
+        from models import User
+        student = User.query.get(sub.student_id)
+        if not student or student.mentor_id != identity['id']:
+            return jsonify({"message": "Unauthorized"}), 403
+            
+    quiz = Quiz.query.get(sub.quiz_id)
+    questions_data = []
+    
+    if quiz:
+        for q_item in quiz.questions:
+            student_ans = sub.answers.get(str(q_item.id), '')
+            
+            # Determine correctness like the submission grading route
+            ans = str(student_ans).strip()
+            correct_ans = str(q_item.correct_answer).strip()
+            is_correct = False
+            
+            if q_item.question_type == 'fill_blank':
+                if ans.lower() == correct_ans.lower() or difflib.SequenceMatcher(None, ans.lower(), correct_ans.lower()).ratio() > 0.85:
+                    is_correct = True
+            elif q_item.question_type == 'match':
+                if ans == correct_ans:
+                    is_correct = True
+            else:
+                if ans.lower() == correct_ans.lower():
+                    is_correct = True
+
+            questions_data.append({
+                "id": q_item.id,
+                "question_type": q_item.question_type,
+                "question_text": q_item.question_text,
+                "options": q_item.options,
+                "correct_answer": q_item.correct_answer,
+                "explanation": q_item.explanation,
+                "marks": q_item.marks,
+                "student_answer": student_ans,
+                "is_correct": is_correct
+            })
+            
+    from models import User
+    student_user = User.query.get(sub.student_id)
+    return jsonify({
+        "id": sub.id,
+        "quiz_id": sub.quiz_id,
+        "quiz_name": quiz.quiz_name if quiz else "Unknown Quiz",
+        "subject": quiz.subject if quiz else "Unknown Subject",
+        "score": sub.score,
+        "total_marks": quiz.total_marks if quiz else 100,
+        "accuracy": sub.accuracy,
+        "time_taken": sub.time_taken,
+        "strong_areas": sub.strong_areas,
+        "weak_areas": sub.weak_areas,
+        "submitted_at": sub.submitted_at.isoformat(),
+        "student_name": student_user.name if student_user else "Unknown Student",
+        "questions": questions_data
+    }), 200
+
 
     
 

@@ -84,7 +84,18 @@ def get_library_materials():
             "created_at": mat.created_at.isoformat()
         })
         
-    return jsonify(result), 200
+    bookmark_folders_raw = user.bookmark_folders if hasattr(user, 'bookmark_folders') else None
+    bookmark_folders = {}
+    if bookmark_folders_raw:
+        try:
+            bookmark_folders = json.loads(bookmark_folders_raw)
+        except Exception:
+            bookmark_folders = {}
+            
+    return jsonify({
+        "materials": result,
+        "bookmark_folders": bookmark_folders
+    }), 200
 
 @library_bp.route('', methods=['POST'])
 @jwt_required()
@@ -230,3 +241,22 @@ def toggle_bookmark(mat_id):
         "is_bookmarked": is_bookmarked,
         "bookmarked_material_ids": user.bookmarked_material_ids
     }), 200
+
+@library_bp.route('/bookmark-folders', methods=['POST'])
+@jwt_required()
+def save_bookmark_folders():
+    identity = json.loads(get_jwt_identity())
+    user = User.query.get(identity['id'])
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+        
+    data = request.get_json() or {}
+    folders = data.get('folders')
+    
+    if folders is None:
+        folders = {}
+        
+    user.bookmark_folders = json.dumps(folders)
+    db.session.commit()
+    
+    return jsonify({"message": "Bookmark folders updated successfully"}), 200

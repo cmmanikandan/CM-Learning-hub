@@ -115,6 +115,7 @@ export interface QuizSubmission {
   quizName: string;
   subject: string;
   studentId: number;
+  studentName?: string;
   score: number;
   totalMarks: number;
   accuracy: number; // percentage
@@ -196,6 +197,8 @@ interface AppContextType {
   addLibraryMaterial: (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'> & { student_ids?: number[] }) => void;
   deleteLibraryMaterial: (id: number) => void;
   toggleBookmarkMaterial: (id: number) => void;
+  bookmarkFolders: Record<string, number[]>;
+  saveBookmarkFolders: (folders: Record<string, number[]>) => Promise<boolean>;
   quizList: Quiz[];
   quizBank: Quiz[];
   addQuiz: (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'> & { student_ids?: number[]; start_time?: string; end_time?: string }) => void;
@@ -227,15 +230,16 @@ interface AppContextType {
   setActiveStudent: (student: UserProfile | null) => void;
   chatMessages: any[];
   fetchChatMessages: (recipientId?: number) => void;
-  sendChatMessage: (recipientId: number | null, content: string) => Promise<any>;
+  sendChatMessage: (recipientId: number | null, content: string, fileUrl?: string, fileName?: string) => Promise<any>;
   leaderboard: any[];
-  fetchLeaderboard: () => void;
+  fetchLeaderboard: (className?: string) => void;
   allChatMessages: any[];
   unreadChatCount: number;
   toast: { message: string; title: string; show: boolean };
   showToast: (title: string, message: string) => void;
   attendanceStats: AttendanceStats | null;
   updateMentorNotes: (studentId: number, notes: string) => Promise<boolean>;
+  removeStudent: (studentId: number) => Promise<boolean>;
   refreshData: () => Promise<void>;
 }
 
@@ -345,6 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [libraryList, setLibraryList] = useState<LibraryMaterial[]>([]);
+  const [bookmarkFolders, setBookmarkFolders] = useState<Record<string, number[]>>({});
   const [quizList, setQuizList] = useState<Quiz[]>([]);
   const [quizBank, setQuizBank] = useState<Quiz[]>([]);
   const [quizSubmissions, setQuizSubmissions] = useState<QuizSubmission[]>([]);
@@ -396,7 +401,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fetch(`${API_BASE}/api/library`, { headers })
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data)) setLibraryList(data.map(m => ({
+          const materials = Array.isArray(data) ? data : (data.materials || []);
+          setLibraryList(materials.map((m: any) => ({
             ...m,
             fileUrl: m.file_url,
             fileName: m.file_url ? m.file_url.split('/').pop() || 'File' : 'File',
@@ -404,6 +410,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             createdTime: m.created_at,
             isBookmarked: !!m.is_bookmarked
           })));
+          if (data && data.bookmark_folders) {
+            setBookmarkFolders(data.bookmark_folders);
+          }
         }).catch(console.error),
 
       fetch(`${API_BASE}/api/quiz`, { headers })
@@ -811,6 +820,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   };
 
+  const saveBookmarkFolders = async (folders: Record<string, number[]>) => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`${API_BASE}/api/library/bookmark-folders`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ folders })
+      });
+      if (res.ok) {
+        setBookmarkFolders(folders);
+        return true;
+      }
+    } catch (err) {
+      console.error('Failed to save bookmark folders:', err);
+    }
+    return false;
+  };
+
   const addQuiz = (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'> & { student_ids?: number[]; start_time?: string; end_time?: string }) => {
     fetch(`${API_BASE}/api/quiz`, {
       method: 'POST',
@@ -1025,7 +1055,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch(console.error);
   };
 
-  const sendChatMessage = async (recipientId: number | null, content: string) => {
+  const sendChatMessage = async (recipientId: number | null, content: string, fileUrl?: string, fileName?: string) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -1034,7 +1064,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ recipient_id: recipientId, content })
+        body: JSON.stringify({ 
+          recipient_id: recipientId, 
+          content,
+          file_url: fileUrl,
+          file_name: fileName
+        })
       });
       if (res.ok) {
         const newMsg = await res.json();
@@ -1046,9 +1081,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const fetchLeaderboard = () => {
+  const fetchLeaderboard = (className?: string) => {
     if (!token) return;
-    fetch(`${API_BASE}/api/users/leaderboard`, { 
+    const url = className
+      ? `${API_BASE}/api/users/leaderboard?class_name=${encodeURIComponent(className)}`
+      : `${API_BASE}/api/users/leaderboard`;
+    fetch(url, { 
       headers: { 'Authorization': `Bearer ${token}` } 
     })
       .then(res => res.json())
@@ -1088,6 +1126,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const removeStudent = async (studentId: number) => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${studentId}/remove-student`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setMyStudents(prev => prev.filter(s => s.id !== studentId));
+        if (activeStudent && activeStudent.id === studentId) {
+          const remaining = myStudents.filter(s => s.id !== studentId);
+          setActiveStudent(remaining.length > 0 ? remaining[0] : null);
+        }
+        showToast('Success', 'Student removed successfully');
+        return true;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast('Error', err.message || 'Failed to remove student');
+      }
+    } catch (err) {
+      console.error("Failed to remove student:", err);
+      showToast('Error', 'Failed to remove student due to a network error');
+    }
+    return false;
+  };
+
   const refreshData = async () => {
     await fetchLiveData();
   };
@@ -1109,6 +1175,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addLibraryMaterial,
       deleteLibraryMaterial,
       toggleBookmarkMaterial,
+      bookmarkFolders,
+      saveBookmarkFolders,
       quizList,
       quizBank,
       addQuiz,
@@ -1149,6 +1217,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast,
       attendanceStats,
       updateMentorNotes,
+      removeStudent,
       refreshData
     }}>
       {children}

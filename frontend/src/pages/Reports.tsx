@@ -15,7 +15,8 @@ import {
   Download,
   Printer,
   Clipboard,
-  User
+  User,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -35,6 +36,12 @@ import {
 
 export const Reports: React.FC = () => {
   const { token } = useAuth();
+  const attFromRef = React.useRef<HTMLInputElement>(null);
+  const attToRef = React.useRef<HTMLInputElement>(null);
+  const hwFromRef = React.useRef<HTMLInputElement>(null);
+  const hwToRef = React.useRef<HTMLInputElement>(null);
+  const testFromRef = React.useRef<HTMLInputElement>(null);
+  const testToRef = React.useRef<HTMLInputElement>(null);
   const { 
     role, 
     homeworkList: rawHwList, 
@@ -514,13 +521,13 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Sub tabs navigation - scrollable on mobile */}
-        <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-full overflow-x-auto border border-slate-200/50 dark:border-slate-700/50 scrollbar-hide">
+        <div className="flex flex-wrap gap-2.5 w-full overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => setActiveSubTab('analytics')}
-            className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-full transition-all gap-1.5 shrink-0 border shadow-sm ${
               activeSubTab === 'analytics' 
-                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-350'
+                ? 'bg-emerald-500 border-emerald-500 text-white' 
+                : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -530,10 +537,10 @@ export const Reports: React.FC = () => {
           {role === 'mentor' && (
             <button 
               onClick={() => setActiveSubTab('attendance')}
-              className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
+              className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-full transition-all gap-1.5 shrink-0 border shadow-sm ${
                 activeSubTab === 'attendance' 
-                  ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-350'
+                  ? 'bg-emerald-500 border-emerald-500 text-white' 
+                  : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
               }`}
             >
               <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -543,10 +550,10 @@ export const Reports: React.FC = () => {
           )}
           <button 
             onClick={() => setActiveSubTab('homework')}
-            className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-full transition-all gap-1.5 shrink-0 border shadow-sm ${
               activeSubTab === 'homework' 
-                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-355'
+                ? 'bg-emerald-500 border-emerald-500 text-white' 
+                : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -555,10 +562,10 @@ export const Reports: React.FC = () => {
           </button>
           <button 
             onClick={() => setActiveSubTab('performance')}
-            className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-full transition-all gap-1.5 shrink-0 border shadow-sm ${
               activeSubTab === 'performance' 
-                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-355'
+                ? 'bg-emerald-500 border-emerald-500 text-white' 
+                : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
             }`}
           >
             <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -747,22 +754,36 @@ export const Reports: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">From Date</label>
-                <input 
-                  type="date" 
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={attFromRef}
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => attFromRef.current?.showPicker()}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">To Date</label>
-                <input 
-                  type="date" 
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={attToRef}
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => attToRef.current?.showPicker()}
+                  />
+                </div>
               </div>
 
               <div>
@@ -975,22 +996,36 @@ export const Reports: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">From Date</label>
-                <input 
-                  type="date" 
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={hwFromRef}
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => hwFromRef.current?.showPicker()}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">To Date</label>
-                <input 
-                  type="date" 
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={hwToRef}
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => hwToRef.current?.showPicker()}
+                  />
+                </div>
               </div>
 
               <div>
@@ -1263,22 +1298,36 @@ export const Reports: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">From Date</label>
-                <input 
-                  type="date" 
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={testFromRef}
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => testFromRef.current?.showPicker()}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-450 uppercase mb-2">To Date</label>
-                <input 
-                  type="date" 
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="date" 
+                    ref={testToRef}
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 pl-3 pr-10 py-2 rounded-xl text-sm text-slate-850 dark:text-white focus:outline-none"
+                  />
+                  <Calendar 
+                    className="absolute right-3.5 text-slate-400 w-4.5 h-4.5 cursor-pointer hover:text-primary-500 transition-colors"
+                    onClick={() => testToRef.current?.showPicker()}
+                  />
+                </div>
               </div>
             </div>
 

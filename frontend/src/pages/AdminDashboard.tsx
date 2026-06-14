@@ -31,6 +31,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
   const [isLoading, setIsLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
+  const [selectedLeaderboardClass, setSelectedLeaderboardClass] = useState<string>('');
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -49,10 +50,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
     }
   };
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = async (className?: string) => {
     setIsLeaderboardLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/users/leaderboard`, {
+      const url = className 
+        ? `${API_BASE}/api/users/leaderboard?class_name=${encodeURIComponent(className)}`
+        : `${API_BASE}/api/users/leaderboard`;
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -69,9 +73,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
   useEffect(() => {
     if (token) {
       fetchStats();
-      fetchLeaderboard();
+      fetchLeaderboard(selectedLeaderboardClass);
     }
-  }, [token]);
+  }, [token, selectedLeaderboardClass]);
 
   const statCards = [
     {
@@ -320,14 +324,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
 
         {/* Streak Leaderboard */}
         <div className="glass-panel rounded-2xl p-5 flex flex-col border border-amber-500/20 bg-gradient-to-b from-white to-amber-50/20 dark:from-slate-900 dark:to-amber-950/5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Trophy className="w-4.5 h-4.5 text-amber-500 animate-float" />
               <h3 className="font-extrabold text-slate-800 dark:text-white font-outfit">Streak Leaderboard</h3>
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full flex items-center gap-1">
-              <Flame className="w-3 h-3 fill-amber-500 text-amber-500 animate-pulse" /> Active
-            </span>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedLeaderboardClass}
+                onChange={(e) => setSelectedLeaderboardClass(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-xl text-[10px] font-bold text-slate-650 dark:text-slate-355 focus:outline-none focus:border-amber-500"
+              >
+                <option value="">All Grades</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="Grade 11">Grade 11</option>
+                <option value="Grade 12">Grade 12</option>
+              </select>
+            </div>
           </div>
 
           {isLeaderboardLoading ? (
@@ -357,9 +370,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
                     <p className="text-sm font-bold text-slate-800 dark:text-white truncate font-outfit">{u.name}</p>
                     <p className="text-[10px] text-slate-400 truncate capitalize">{u.class_name || 'Grade 10'} {u.section || 'A'}</p>
                   </div>
-                  <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl text-xs font-black shrink-0">
-                    <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                    <span>{u.streak}</span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl text-xs font-black shrink-0">
+                      <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                      <span>{u.streak}</span>
+                    </div>
+                    {u.badge_count > 0 && (
+                      <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/15 text-amber-650 dark:text-amber-405 rounded-md text-[9px] font-bold">
+                        <Trophy className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                        <span>{u.badge_count}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
