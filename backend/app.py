@@ -20,6 +20,7 @@ def create_app():
     app.config['FIREBASE_JSON_LEN'] = 0
     
     # Configure app settings
+    app.config['DB_CONNECTION_ERROR'] = None
     db_uri = os.getenv('DATABASE_URL')
     if db_uri:
         from sqlalchemy import create_engine
@@ -31,6 +32,7 @@ def create_app():
                 app.logger.info("Successfully connected to the remote database.")
         except Exception as e:
             app.logger.warning(f"Could not connect to database specified in DATABASE_URL: {e}")
+            app.config['DB_CONNECTION_ERROR'] = str(e)
             app.logger.info("Falling back to local SQLite database: cm_learning_hub.db")
             db_uri = 'sqlite:///cm_learning_hub.db'
     else:
@@ -200,7 +202,8 @@ def create_app():
             "prefix_char_codes": prefix_chars,
             "prefix_str_safe": prefix_str.replace('\n', '\\n').replace('\r', '\\r'),
             "env_database_url": masked_db_url,
-            "config_database_url": masked_config_db_url
+            "config_database_url": masked_config_db_url,
+            "db_connection_error": app.config.get('DB_CONNECTION_ERROR')
         }), 200
         
     @app.route('/')
