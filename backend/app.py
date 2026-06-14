@@ -177,6 +177,14 @@ def create_app():
             "version": "1.0.0"
         }), 200
         
+    @app.route('/api/config/cloudinary', methods=['GET'])
+    def cloudinary_config():
+        import os
+        return jsonify({
+            "cloud_name": os.getenv('VITE_CLOUDINARY_CLOUD_NAME') or os.getenv('CLOUDINARY_CLOUD_NAME'),
+            "upload_preset": os.getenv('VITE_CLOUDINARY_UPLOAD_PRESET') or os.getenv('CLOUDINARY_UPLOAD_PRESET')
+        }), 200
+        
     @app.after_request
     def add_cache_control_headers(response):
         # Disable caching for all API responses to prevent session/state leak
