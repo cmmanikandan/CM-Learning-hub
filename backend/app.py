@@ -214,21 +214,12 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
-            if User.query.count() == 0:
-                app.logger.info("SQLite database is empty, auto-seeding default users...")
-                from werkzeug.security import generate_password_hash
-                
-                # Create default admin
-                admin = User(
-                    username="admin",
-                    email="admin@cmlearninghub.com",
-                    password_hash=generate_password_hash("AdminPassword123!"),
-                    role="admin",
-                    name="System Admin"
-                )
-                db.session.add(admin)
-
-                # Create default mentor
+            
+            # Failsafe: check and fix admin credentials/role on startup
+            from werkzeug.security import generate_password_hash
+            
+            mentor = User.query.filter_by(email="mentor@cmlearninghub.com").first()
+            if not mentor:
                 mentor = User(
                     username="mentor_test",
                     email="mentor@cmlearninghub.com",
@@ -238,7 +229,39 @@ def create_app():
                     tid="TID-MENTOR1"
                 )
                 db.session.add(mentor)
-                db.session.flush() # Get mentor ID
+                db.session.flush()
+
+            admin = User.query.filter_by(email="admin@cmlearninghub.com").first()
+            if admin:
+                # Always ensure correct admin role and credentials
+                admin.role = "admin"
+                admin.username = "admin"
+                admin.name = "System Admin"
+                admin.password_hash = generate_password_hash("AdminPassword123!")
+                admin.tid = None
+                
+                # Reassign admin's students to the mentor
+                students = User.query.filter_by(mentor_id=admin.id).all()
+                for s in students:
+                    s.mentor_id = mentor.id
+                
+                db.session.commit()
+                app.logger.info("Failsafe: Verified and updated admin@cmlearninghub.com to admin role & password.")
+            else:
+                # Create default admin if missing
+                admin = User(
+                    username="admin",
+                    email="admin@cmlearninghub.com",
+                    password_hash=generate_password_hash("AdminPassword123!"),
+                    role="admin",
+                    name="System Admin"
+                )
+                db.session.add(admin)
+                db.session.commit()
+                app.logger.info("Failsafe: Created admin@cmlearninghub.com user.")
+
+            if User.query.count() <= 2: # only admin and mentor exist
+                app.logger.info("SQLite database is empty, auto-seeding default students...")
                 
                 # Create default student (no mentor)
                 student = User(
