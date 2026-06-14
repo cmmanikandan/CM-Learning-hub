@@ -345,8 +345,8 @@ export const TestManager: React.FC<TestManagerProps> = ({
         instructions,
         duration,
         totalMarks,
-        startDate: !isBank ? new Date(startDate).toISOString() : undefined,
-        endDate: !isBank ? new Date(endDate).toISOString() : undefined,
+        startDate: !isBank ? startDate : undefined,
+        endDate: !isBank ? endDate : undefined,
         questionPaperUrl: paperUrl,
         questionPaperName: paperName,
         is_bank: isBank,
@@ -388,7 +388,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
     }
 
     try {
-      await assignWrittenTest(id, new Date(assignStartDate).toISOString(), new Date(assignEndDate).toISOString(), studentIds);
+      await assignWrittenTest(id, assignStartDate, assignEndDate, studentIds);
       setShowAssignModal(null);
       setAssignStartDate('');
       setAssignEndDate('');
@@ -629,10 +629,10 @@ export const TestManager: React.FC<TestManagerProps> = ({
                                 {(grouped.startDate || grouped.endDate) && (
                                   <div className="mt-3.5 p-2 bg-slate-100/60 dark:bg-slate-800/40 rounded-xl text-[9px] text-slate-555 font-bold space-y-0.5">
                                     {grouped.startDate && (
-                                      <p>Starts: <span className="text-slate-700 dark:text-slate-300">{new Date(grouped.startDate).toLocaleString()}</span></p>
+                                      <p>Starts: <span className="text-slate-700 dark:text-slate-300">{grouped.startDate.replace('T', ' ').substring(0, 16)}</span></p>
                                     )}
                                     {grouped.endDate && (
-                                      <p>Ends: <span className="text-slate-700 dark:text-slate-300">{new Date(grouped.endDate).toLocaleString()}</span></p>
+                                      <p>Ends: <span className="text-slate-700 dark:text-slate-300">{grouped.endDate.replace('T', ' ').substring(0, 16)}</span></p>
                                     )}
                                   </div>
                                 )}

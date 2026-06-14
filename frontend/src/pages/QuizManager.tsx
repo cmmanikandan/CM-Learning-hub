@@ -80,8 +80,8 @@ const LiveCountdown: React.FC<{ startTime?: string; endTime?: string; onUpdate?:
 
     const updateTimer = () => {
       const now = new Date().getTime();
-      const start = startTime ? new Date(startTime).getTime() : 0;
-      const end = endTime ? new Date(endTime).getTime() : Infinity;
+      const start = startTime ? new Date(startTime.replace('T', ' ')).getTime() : 0;
+      const end = endTime ? new Date(endTime.replace('T', ' ')).getTime() : Infinity;
 
       if (startTime && now < start) {
         setStatus('future');
@@ -538,8 +538,8 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
       is_bank: isBank,
       questions,
       student_ids: studentIds,
-      start_time: !isBank && assignStartTime ? new Date(assignStartTime).toISOString() : undefined,
-      end_time: !isBank && assignEndTime ? new Date(assignEndTime).toISOString() : undefined,
+      start_time: !isBank && assignStartTime ? assignStartTime : undefined,
+      end_time: !isBank && assignEndTime ? assignEndTime : undefined,
       assignment_date: !isBank ? assignDate : undefined
     });
 
@@ -623,8 +623,8 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     
     assignQuiz(id, assignDate, {
       student_ids: studentIds,
-      start_time: assignStartTime ? new Date(assignStartTime).toISOString() : undefined,
-      end_time: assignEndTime ? new Date(assignEndTime).toISOString() : undefined
+      start_time: assignStartTime ? assignStartTime : undefined,
+      end_time: assignEndTime ? assignEndTime : undefined
     });
     
     setShowAssignModal(null);
@@ -783,10 +783,10 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                               {(grouped.start_time || grouped.end_time) && (
                                 <div className="mt-3.5 p-2 bg-slate-100/60 dark:bg-slate-800/40 rounded-xl text-[9px] text-slate-500 font-bold space-y-0.5">
                                   {grouped.start_time && (
-                                    <p>Starts: <span className="text-slate-700 dark:text-slate-350">{new Date(grouped.start_time).toLocaleString()}</span></p>
+                                    <p>Starts: <span className="text-slate-700 dark:text-slate-350">{grouped.start_time.replace('T', ' ').substring(0, 16)}</span></p>
                                   )}
                                   {grouped.end_time && (
-                                    <p>Ends: <span className="text-slate-700 dark:text-slate-355">{new Date(grouped.end_time).toLocaleString()}</span></p>
+                                    <p>Ends: <span className="text-slate-700 dark:text-slate-355">{grouped.end_time.replace('T', ' ').substring(0, 16)}</span></p>
                                   )}
                                 </div>
                               )}
@@ -1136,8 +1136,8 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                 const hasSub = quizSubmissions.some(s => s.quizId === quiz.id);
                 const sub = quizSubmissions.find(s => s.quizId === quiz.id);
 
-                const startTimeMs = quiz.start_time ? new Date(quiz.start_time).getTime() : 0;
-                const endTimeMs = quiz.end_time ? new Date(quiz.end_time).getTime() : Infinity;
+                const startTimeMs = quiz.start_time ? new Date(quiz.start_time.replace('T', ' ')).getTime() : 0;
+                const endTimeMs = quiz.end_time ? new Date(quiz.end_time.replace('T', ' ')).getTime() : Infinity;
 
                 const isLocked = quiz.start_time ? currentTime < startTimeMs : false;
                 const isExpired = quiz.end_time ? currentTime > endTimeMs : false;
