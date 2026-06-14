@@ -385,11 +385,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Fetch all live data when user and token are ready
+  // Requests are split into 3 priority batches to avoid overwhelming the DB connection pool
   const fetchLiveData = async (): Promise<void> => {
     if (!user || !token) return;
     const headers = { 'Authorization': `Bearer ${token}` };
 
-    const promises = [
+    // ── BATCH 1: Critical data (show UI immediately) ──────────────────────────
+    const batch1: Promise<any>[] = [
       fetch(`${API_BASE}/api/homework`, { headers })
         .then(res => res.json())
         .then(data => {
@@ -398,6 +400,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })));
         }).catch(console.error),
 
+      fetch(`${API_BASE}/api/notifications`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setNotifications(data);
+        }).catch(console.error),
+
+      fetch(`${API_BASE}/api/chat/all-messages`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setAllChatMessages(data);
+        }).catch(console.error),
+    ];
+
+    // Add role-specific critical calls to batch 1
+    if (user.role === 'mentor') {
+      batch1.push(
+        fetch(`${API_BASE}/api/users/my-students`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              const mappedStudents: UserProfile[] = data.map((s: any) => ({
+                id: s.id,
+                username: s.username || s.email || '',
+                email: s.email || '',
+                role: 'student' as const,
+                name: s.name || '',
+                photoUrl: s.photo_url || '',
+                school: s.school || '',
+                className: s.class_name || '',
+                section: s.section || '',
+                parentContact: s.parent_contact || '',
+                mentor_id: s.mentor_id,
+                streak: s.streak || 0,
+                sid: s.sid || '',
+                tid: s.tid || '',
+                mentor_notes: s.mentor_notes || '',
+              }));
+              setMyStudents(mappedStudents);
+              if (mappedStudents.length > 0 && !activeStudent) {
+                setActiveStudent(mappedStudents[0]);
+              }
+            }
+          }).catch(console.error)
+      );
+    }
+
+    await Promise.allSettled(batch1);
+
+    // ── BATCH 2: Important secondary data ────────────────────────────────────
+    const batch2: Promise<any>[] = [
       fetch(`${API_BASE}/api/library`, { headers })
         .then(res => res.json())
         .then(data => {
@@ -423,19 +475,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })));
         }).catch(console.error),
 
-      fetch(`${API_BASE}/api/quiz/bank`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setQuizBank(data.map(q => ({
-            ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, is_bank: true
-          })));
-        }).catch(console.error),
-
       fetch(`${API_BASE}/api/tests`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setWrittenTests(data.map(t => ({
             ...t, testName: t.test_name, startDate: t.start_date, endDate: t.end_date, totalMarks: t.total_marks, questionPaperUrl: t.question_paper_url, createdTime: t.created_at, is_bank: t.is_bank
+          })));
+        }).catch(console.error),
+
+      fetch(`${API_BASE}/api/users/leaderboard`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setLeaderboard(data);
+        }).catch(console.error),
+    ];
+
+    await Promise.allSettled(batch2);
+
+    // ── BATCH 3: Background/secondary data ────────────────────────────────────
+    const batch3: Promise<any>[] = [
+      fetch(`${API_BASE}/api/quiz/bank`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setQuizBank(data.map(q => ({
+            ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, is_bank: true
           })));
         }).catch(console.error),
 
@@ -455,13 +518,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })));
         }).catch(console.error),
 
-      fetch(`${API_BASE}/api/notifications`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setNotifications(data);
-        }).catch(console.error),
-
-      // Quiz Submissions Fetch
       fetch(`${API_BASE}/api/quiz/submissions`, { headers })
         .then(res => res.json())
         .then(data => {
@@ -469,78 +525,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...s, quizId: s.quiz_id, quizName: s.quiz_name, studentId: s.student_id, studentName: s.student_name, totalMarks: s.total_marks, submittedAt: s.submitted_at, timeTaken: s.time_taken, strongAreas: s.strong_areas, weakAreas: s.weak_areas
           })));
         }).catch(console.error),
-
-      // Leaderboard Fetch
-      fetch(`${API_BASE}/api/users/leaderboard`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setLeaderboard(data);
-        }).catch(console.error),
-
-      // Initial all chat messages fetch
-      fetch(`${API_BASE}/api/chat/all-messages`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setAllChatMessages(data);
-        }).catch(console.error)
     ];
 
-    // Dynamic Achievements Fetch
+    // Add role-specific background calls to batch 3
     if (user.role === 'mentor' && activeStudent) {
-      promises.push(
+      batch3.push(
         fetch(`${API_BASE}/api/achievements/student/${activeStudent.id}`, { headers })
           .then(res => res.json())
           .then(data => {
             if (Array.isArray(data)) setAchievements(data);
           }).catch(console.error)
       );
-    } else if (user.role === 'student') {
-      promises.push(
-        fetch(`${API_BASE}/api/achievements`, { headers })
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) setAchievements(data);
-          }).catch(console.error)
-      );
-    }
-
-    // Mentor specific: Fetch students
-    if (user.role === 'mentor') {
-      promises.push(
-        fetch(`${API_BASE}/api/users/my-students`, { headers })
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) {
-              const mappedStudents: UserProfile[] = data.map((s: any) => ({
-                id: s.id,
-                username: s.username || s.email || '',
-                email: s.email || '',
-                role: 'student' as const,
-                name: s.name || '',
-                photoUrl: s.photo_url || '',
-                school: s.school || '',
-                className: s.class_name || '',
-                section: s.section || '',
-                parentContact: s.parent_contact || '',
-                mentor_id: s.mentor_id,
-                streak: s.streak || 0,
-                sid: s.sid || '',
-                tid: s.tid || '',
-                mentor_notes: s.mentor_notes || '',
-              }));
-              setMyStudents(mappedStudents);
-              if (mappedStudents.length > 0 && !activeStudent) {
-                // Ensure we check local storage or keep it
-                setActiveStudent(mappedStudents[0]);
-              }
-            }
-          }).catch(console.error)
-      );
-    }
-
-    // Fetch attendance stats
-    if (user.role === 'mentor' && activeStudent) {
-      promises.push(
+      batch3.push(
         fetch(`${API_BASE}/api/attendance/stats?student_id=${activeStudent.id}`, { headers })
           .then(res => res.json())
           .then(data => {
@@ -548,7 +544,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }).catch(console.error)
       );
     } else if (user.role === 'student') {
-      promises.push(
+      batch3.push(
+        fetch(`${API_BASE}/api/achievements`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setAchievements(data);
+          }).catch(console.error)
+      );
+      batch3.push(
         fetch(`${API_BASE}/api/attendance/stats`, { headers })
           .then(res => res.json())
           .then(data => {
@@ -557,7 +560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
 
-    await Promise.allSettled(promises);
+    await Promise.allSettled(batch3);
   };
 
   useEffect(() => {
