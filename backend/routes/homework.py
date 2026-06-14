@@ -208,12 +208,9 @@ def get_all_homework():
         return jsonify(result), 200
         
     elif identity['role'] == 'mentor':
-        students = User.query.filter_by(mentor_id=identity['id']).all()
-        student_ids = [s.id for s in students]
-        
-        # Only query original assignments (carried_from_id is None)
+        # Only query original assignments (carried_from_id is None) created by this mentor
         query = query.filter(
-            ((Homework.student_id.in_(student_ids)) | (Homework.student_id.is_(None))) &
+            (Homework.mentor_id == identity['id']) &
             (Homework.carried_from_id.is_(None))
         )
         if subject:

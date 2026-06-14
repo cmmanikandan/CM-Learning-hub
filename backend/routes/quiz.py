@@ -26,10 +26,8 @@ def get_quizzes():
             
         quizzes = Quiz.query.filter_by(is_bank=False).filter(q_filter).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
     elif identity['role'] == 'mentor':
-        students = User.query.filter_by(mentor_id=identity['id']).all()
-        student_ids = [s.id for s in students]
         quizzes = Quiz.query.filter_by(is_bank=False).filter(
-            (Quiz.student_id.in_(student_ids)) | (Quiz.student_id.is_(None))
+            Quiz.mentor_id == identity['id']
         ).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()
     else:
         quizzes = Quiz.query.filter_by(is_bank=False).order_by(Quiz.assignment_date.desc(), Quiz.created_at.desc()).all()

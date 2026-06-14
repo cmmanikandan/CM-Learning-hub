@@ -241,11 +241,28 @@ def create_app():
                 db.session.add(mentor)
                 db.session.flush()
 
-            admin = User.query.filter_by(email="admin@cmlearninghub.com").first()
+            # Resolve duplicate admins to prevent UniqueViolation
+            admins_to_clean = User.query.filter((User.email == "admin@cmlearninghub.com") | (User.username == "admin")).all()
+            if len(admins_to_clean) > 1:
+                app.logger.info(f"Failsafe: Found {len(admins_to_clean)} duplicate admin users. Cleaning up...")
+                # Reassign students from all conflicting admins to mentor
+                for a in admins_to_clean:
+                    students = User.query.filter_by(mentor_id=a.id).all()
+                    for s in students:
+                        s.mentor_id = mentor.id
+                    db.session.delete(a)
+                db.session.commit()
+                admin = None
+            elif len(admins_to_clean) == 1:
+                admin = admins_to_clean[0]
+            else:
+                admin = None
+
             if admin:
                 # Always ensure correct admin role and credentials
                 admin.role = "admin"
                 admin.username = "admin"
+                admin.email = "admin@cmlearninghub.com"
                 admin.name = "System Admin"
                 admin.password_hash = generate_password_hash("AdminPassword123!")
                 admin.tid = None
@@ -256,7 +273,7 @@ def create_app():
                     s.mentor_id = mentor.id
                 
                 db.session.commit()
-                app.logger.info("Failsafe: Verified and updated admin@cmlearninghub.com to admin role & password.")
+                app.logger.info("Failsafe: Verified and updated admin to admin role & password.")
             else:
                 # Create default admin if missing
                 admin = User(
@@ -312,6 +329,7 @@ def create_app():
                 db.session.commit()
                 app.logger.info("Default users seeded successfully!")
         except Exception as e:
+            db.session.rollback()
             app.logger.warning(f"Could not automatically create/seed database tables: {e}")
 
     return app

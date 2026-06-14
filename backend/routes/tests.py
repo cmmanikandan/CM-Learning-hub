@@ -25,10 +25,8 @@ def get_written_tests():
             
         tests = WrittenTest.query.filter_by(is_bank=False).filter(t_filter).order_by(WrittenTest.created_at.desc()).all()
     elif identity['role'] == 'mentor':
-        students = User.query.filter_by(mentor_id=identity['id']).all()
-        student_ids = [s.id for s in students]
         tests = WrittenTest.query.filter_by(is_bank=False).filter(
-            (WrittenTest.student_id.in_(student_ids)) | (WrittenTest.student_id.is_(None))
+            WrittenTest.mentor_id == identity['id']
         ).order_by(WrittenTest.created_at.desc()).all()
     else:
         tests = WrittenTest.query.filter_by(is_bank=False).order_by(WrittenTest.created_at.desc()).all()
