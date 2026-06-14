@@ -14,7 +14,8 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,10 +42,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
     achievements,
     leaderboard,
     fetchLeaderboard,
-    attendanceStats
+    attendanceStats,
+    refreshData
   } = useApp();
   
   const { token, fetchProfile } = useAuth();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const [quote, setQuote] = useState(MOTIVATIONAL_QUOTES[0]);
 
@@ -255,7 +270,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
             <span className="bg-white/20 text-white font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-widest">
               Student Portal
             </span>
-            <h2 className="text-xl sm:text-2xl font-black font-outfit mt-2">Hi, {studentProfile.name}! 👋</h2>
+            <h2 className="text-xl sm:text-2xl font-black font-outfit mt-2 flex items-center gap-2">
+              Hi, {studentProfile.name}! 👋
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white/80 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            </h2>
             <p className="text-white/75 text-sm mt-1">Keep up the great momentum. Here's your daily overview.</p>
           </div>
           <div className="flex items-center gap-3 self-start md:self-auto">

@@ -11,6 +11,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   RotateCw, 
+  RotateCcw,
   CheckCircle, 
   FileText, 
   Calendar, 
@@ -164,8 +165,22 @@ export const TestManager: React.FC<TestManagerProps> = ({
     writtenTestSubmissions, 
     submitWrittenTest, 
     gradeWrittenSubmission,
-    myStudents
+    myStudents,
+    refreshData
   } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Tick state for live countdowns
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -475,7 +490,17 @@ export const TestManager: React.FC<TestManagerProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white">Written Exams</h2>
+              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+                Written Exams
+                <button 
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+                  title="Refresh Data"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              </h2>
               <p className="text-xs text-slate-400 font-medium">Design school exams, collect student answer sheets, and grade online</p>
             </div>
             
@@ -1111,7 +1136,17 @@ export const TestManager: React.FC<TestManagerProps> = ({
       {role === 'student' && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white">Written Exams</h2>
+            <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+              Written Exams
+              <button 
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-605 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            </h2>
             <p className="text-xs text-slate-400 font-medium">Download question sheets and submit answer files</p>
           </div>
 

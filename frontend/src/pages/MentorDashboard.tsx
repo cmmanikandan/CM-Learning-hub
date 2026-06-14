@@ -14,6 +14,7 @@ import {
   BarChart3,
   Zap,
   Award,
+  RotateCcw,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -42,8 +43,22 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
     quizSubmissions,
     writtenTests,
     writtenTestSubmissions,
-    updateMentorNotes
+    updateMentorNotes,
+    refreshData
   } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const [stickyNotes,       setStickyNotes]       = React.useState(studentProfile?.mentor_notes || '');
   const [isSavingNotes,     setIsSavingNotes]     = React.useState(false);
@@ -235,7 +250,17 @@ export const MentorDashboard: React.FC<MentorDashboardProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold uppercase tracking-widest text-white/60">Mentor Portal</span>
             </div>
-            <h2 className="text-2xl font-black font-outfit">Welcome back, {mentorProfile?.name || 'Mentor'}! 👋</h2>
+            <h2 className="text-2xl font-black font-outfit flex items-center gap-2">
+              Welcome back, {mentorProfile?.name || 'Mentor'}! 👋
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white/80 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            </h2>
             <p className="text-white/75 text-sm mt-1">
               Monitoring <strong className="text-white">{studentProfile.name}</strong> · Let's check today's progress.
             </p>

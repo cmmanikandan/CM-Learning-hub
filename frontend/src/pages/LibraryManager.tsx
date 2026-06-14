@@ -16,7 +16,8 @@ import {
   ExternalLink,
   Filter,
   X,
-  ChevronDown
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
 
 const CARD_THEMES = [
@@ -98,8 +99,22 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
     addLibraryMaterial, 
     deleteLibraryMaterial, 
     toggleBookmarkMaterial,
-    myStudents
+    myStudents,
+    refreshData
   } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -259,7 +274,17 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
       {/* ── Header bar ── */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold font-outfit text-slate-800 dark:text-white">Library</h2>
+          <h2 className="text-xl sm:text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+            Library
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+              title="Refresh Data"
+            >
+              <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </h2>
           <p className="text-xs text-slate-400 font-medium mt-0.5">Browse textbooks, worksheets &amp; study collections</p>
         </div>
         

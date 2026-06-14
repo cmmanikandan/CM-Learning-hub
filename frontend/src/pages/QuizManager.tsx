@@ -157,10 +157,23 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     deleteQuiz,
     quizSubmissions, 
     submitQuiz,
-    myStudents
+    myStudents,
+    refreshData
   } = useApp();
 
   const { token } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Target assignment states
   const [assignTarget, setAssignTarget] = useState<'all' | 'class' | 'students'>('all');
@@ -630,7 +643,17 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white">Quiz Management</h2>
+              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+                Quiz Management
+                <button 
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+                  title="Refresh Data"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              </h2>
               <p className="text-xs text-slate-400 font-medium">Design skill exams, assign daily tests, and track progress</p>
             </div>
             
@@ -1094,7 +1117,17 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
       {role === 'student' && !activeQuiz && !recentReport && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white">Assigned Quizzes</h2>
+            <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+              Assigned Quizzes
+              <button 
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-605 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            </h2>
             <p className="text-xs text-slate-400 font-medium">Complete your daily scheduled tests</p>
           </div>          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {quizList.filter(q => !q.is_bank).length > 0 ? (

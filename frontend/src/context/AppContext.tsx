@@ -236,6 +236,7 @@ interface AppContextType {
   showToast: (title: string, message: string) => void;
   attendanceStats: AttendanceStats | null;
   updateMentorNotes: (studentId: number, notes: string) => Promise<boolean>;
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -379,161 +380,175 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Fetch all live data when user and token are ready
-  const fetchLiveData = () => {
+  const fetchLiveData = async (): Promise<void> => {
     if (!user || !token) return;
     const headers = { 'Authorization': `Bearer ${token}` };
 
-    fetch(`${API_BASE}/api/homework`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setHomeworkList(data.map(h => ({
-          ...h, homeworkType: h.homework_type, estimatedTime: h.estimated_time, dueDate: h.due_date, attachmentUrl: h.attachment_url, createdTime: h.created_at, carriedFromId: h.carried_from_id, studentId: h.student_id, studentName: h.student_name, students: h.students, completion_percentage: h.completion_percentage
-        })));
-      }).catch(console.error);
+    const promises = [
+      fetch(`${API_BASE}/api/homework`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setHomeworkList(data.map(h => ({
+            ...h, homeworkType: h.homework_type, estimatedTime: h.estimated_time, dueDate: h.due_date, attachmentUrl: h.attachment_url, createdTime: h.created_at, carriedFromId: h.carried_from_id, studentId: h.student_id, studentName: h.student_name, students: h.students, completion_percentage: h.completion_percentage
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/library`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setLibraryList(data.map(m => ({
-          ...m,
-          fileUrl: m.file_url,
-          fileName: m.file_url ? m.file_url.split('/').pop() || 'File' : 'File',
-          thumbnailUrl: m.thumbnail_url,
-          createdTime: m.created_at,
-          isBookmarked: !!m.is_bookmarked
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/library`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setLibraryList(data.map(m => ({
+            ...m,
+            fileUrl: m.file_url,
+            fileName: m.file_url ? m.file_url.split('/').pop() || 'File' : 'File',
+            thumbnailUrl: m.thumbnail_url,
+            createdTime: m.created_at,
+            isBookmarked: !!m.is_bookmarked
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/quiz`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setQuizList(data.map(q => ({
-          ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, assignment_date: q.assignment_date, is_bank: q.is_bank
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/quiz`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setQuizList(data.map(q => ({
+            ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, assignment_date: q.assignment_date, is_bank: q.is_bank
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/quiz/bank`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setQuizBank(data.map(q => ({
-          ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, is_bank: true
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/quiz/bank`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setQuizBank(data.map(q => ({
+            ...q, quizName: q.quiz_name, timeLimit: q.time_limit, passingMarks: q.passing_marks, totalMarks: q.total_marks, createdTime: q.created_at, is_bank: true
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/tests`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWrittenTests(data.map(t => ({
-          ...t, testName: t.test_name, startDate: t.start_date, endDate: t.end_date, totalMarks: t.total_marks, questionPaperUrl: t.question_paper_url, createdTime: t.created_at, is_bank: t.is_bank
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/tests`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setWrittenTests(data.map(t => ({
+            ...t, testName: t.test_name, startDate: t.start_date, endDate: t.end_date, totalMarks: t.total_marks, questionPaperUrl: t.question_paper_url, createdTime: t.created_at, is_bank: t.is_bank
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/tests/bank`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWrittenTestBank(data.map(t => ({
-          ...t, testName: t.test_name, startDate: t.start_date, endDate: t.end_date, totalMarks: t.total_marks, questionPaperUrl: t.question_paper_url, createdTime: t.created_at, is_bank: t.is_bank
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/tests/bank`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setWrittenTestBank(data.map(t => ({
+            ...t, testName: t.test_name, startDate: t.start_date, endDate: t.end_date, totalMarks: t.total_marks, questionPaperUrl: t.question_paper_url, createdTime: t.created_at, is_bank: t.is_bank
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/tests/submissions`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWrittenTestSubmissions(data.map(s => ({
-          ...s, testId: s.test_id, testName: s.test_name, studentId: s.student_id, studentName: s.student_name, answerSheetUrl: s.answer_sheet_url, submissionDate: s.submission_date, marksObtained: s.marks_obtained, totalMarks: s.total_marks, gradedAt: s.graded_at
-        })));
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/tests/submissions`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setWrittenTestSubmissions(data.map(s => ({
+            ...s, testId: s.test_id, testName: s.test_name, studentId: s.student_id, studentName: s.student_name, answerSheetUrl: s.answer_sheet_url, submissionDate: s.submission_date, marksObtained: s.marks_obtained, totalMarks: s.total_marks, gradedAt: s.graded_at
+          })));
+        }).catch(console.error),
 
-    fetch(`${API_BASE}/api/notifications`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setNotifications(data);
-      }).catch(console.error);
+      fetch(`${API_BASE}/api/notifications`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setNotifications(data);
+        }).catch(console.error),
+
+      // Quiz Submissions Fetch
+      fetch(`${API_BASE}/api/quiz/submissions`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setQuizSubmissions(data.map(s => ({
+            ...s, quizId: s.quiz_id, quizName: s.quiz_name, studentId: s.student_id, studentName: s.student_name, totalMarks: s.total_marks, submittedAt: s.submitted_at, timeTaken: s.time_taken, strongAreas: s.strong_areas, weakAreas: s.weak_areas
+          })));
+        }).catch(console.error),
+
+      // Leaderboard Fetch
+      fetch(`${API_BASE}/api/users/leaderboard`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setLeaderboard(data);
+        }).catch(console.error),
+
+      // Initial all chat messages fetch
+      fetch(`${API_BASE}/api/chat/all-messages`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setAllChatMessages(data);
+        }).catch(console.error)
+    ];
 
     // Dynamic Achievements Fetch
     if (user.role === 'mentor' && activeStudent) {
-      fetch(`${API_BASE}/api/achievements/student/${activeStudent.id}`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setAchievements(data);
-        }).catch(console.error);
+      promises.push(
+        fetch(`${API_BASE}/api/achievements/student/${activeStudent.id}`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setAchievements(data);
+          }).catch(console.error)
+      );
     } else if (user.role === 'student') {
-      fetch(`${API_BASE}/api/achievements`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setAchievements(data);
-        }).catch(console.error);
+      promises.push(
+        fetch(`${API_BASE}/api/achievements`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setAchievements(data);
+          }).catch(console.error)
+      );
     }
-
-    // Quiz Submissions Fetch
-    fetch(`${API_BASE}/api/quiz/submissions`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setQuizSubmissions(data.map(s => ({
-          ...s, quizId: s.quiz_id, quizName: s.quiz_name, studentId: s.student_id, studentName: s.student_name, totalMarks: s.total_marks, submittedAt: s.submitted_at, timeTaken: s.time_taken, strongAreas: s.strong_areas, weakAreas: s.weak_areas
-        })));
-      }).catch(console.error);
 
     // Mentor specific: Fetch students
     if (user.role === 'mentor') {
-      fetch(`${API_BASE}/api/users/my-students`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            const mappedStudents: UserProfile[] = data.map((s: any) => ({
-              id: s.id,
-              username: s.username || s.email || '',
-              email: s.email || '',
-              role: 'student' as const,
-              name: s.name || '',
-              photoUrl: s.photo_url || '',
-              school: s.school || '',
-              className: s.class_name || '',
-              section: s.section || '',
-              parentContact: s.parent_contact || '',
-              mentor_id: s.mentor_id,
-              streak: s.streak || 0,
-              sid: s.sid || '',
-              tid: s.tid || '',
-              mentor_notes: s.mentor_notes || '',
-            }));
-            setMyStudents(mappedStudents);
-            if (mappedStudents.length > 0 && !activeStudent) {
-              // Ensure we check local storage or keep it
-              setActiveStudent(mappedStudents[0]);
+      promises.push(
+        fetch(`${API_BASE}/api/users/my-students`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              const mappedStudents: UserProfile[] = data.map((s: any) => ({
+                id: s.id,
+                username: s.username || s.email || '',
+                email: s.email || '',
+                role: 'student' as const,
+                name: s.name || '',
+                photoUrl: s.photo_url || '',
+                school: s.school || '',
+                className: s.class_name || '',
+                section: s.section || '',
+                parentContact: s.parent_contact || '',
+                mentor_id: s.mentor_id,
+                streak: s.streak || 0,
+                sid: s.sid || '',
+                tid: s.tid || '',
+                mentor_notes: s.mentor_notes || '',
+              }));
+              setMyStudents(mappedStudents);
+              if (mappedStudents.length > 0 && !activeStudent) {
+                // Ensure we check local storage or keep it
+                setActiveStudent(mappedStudents[0]);
+              }
             }
-          }
-        }).catch(console.error);
+          }).catch(console.error)
+      );
     }
-
-    // Leaderboard Fetch
-    fetch(`${API_BASE}/api/users/leaderboard`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setLeaderboard(data);
-      }).catch(console.error);
-
-    // Initial all chat messages fetch
-    fetch(`${API_BASE}/api/chat/all-messages`, { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setAllChatMessages(data);
-      }).catch(console.error);
 
     // Fetch attendance stats
     if (user.role === 'mentor' && activeStudent) {
-      fetch(`${API_BASE}/api/attendance/stats?student_id=${activeStudent.id}`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (data && typeof data.percentage === 'number') setAttendanceStats(data);
-        }).catch(console.error);
+      promises.push(
+        fetch(`${API_BASE}/api/attendance/stats?student_id=${activeStudent.id}`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (data && typeof data.percentage === 'number') setAttendanceStats(data);
+          }).catch(console.error)
+      );
     } else if (user.role === 'student') {
-      fetch(`${API_BASE}/api/attendance/stats`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (data && typeof data.percentage === 'number') setAttendanceStats(data);
-        }).catch(console.error);
+      promises.push(
+        fetch(`${API_BASE}/api/attendance/stats`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (data && typeof data.percentage === 'number') setAttendanceStats(data);
+          }).catch(console.error)
+      );
     }
+
+    await Promise.allSettled(promises);
   };
 
   useEffect(() => {
@@ -1073,6 +1088,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const refreshData = async () => {
+    await fetchLiveData();
+  };
+
   return (
     <AppContext.Provider value={{
       role,
@@ -1129,7 +1148,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast,
       showToast,
       attendanceStats,
-      updateMentorNotes
+      updateMentorNotes,
+      refreshData
     }}>
       {children}
     </AppContext.Provider>

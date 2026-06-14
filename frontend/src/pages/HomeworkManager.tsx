@@ -17,7 +17,8 @@ import {
   Check,
   Sparkles,
   Download,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from 'lucide-react';
 
 interface HomeworkManagerProps {
@@ -36,8 +37,22 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
     updateHomework, 
     deleteHomework, 
     duplicateHomework,
-    myStudents
+    myStudents,
+    refreshData
   } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter/Search states (Teacher)
   const [searchTerm, setSearchTerm] = useState('');
@@ -432,7 +447,17 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white">Homework Hub</h2>
+              <h2 className="text-2xl font-bold font-outfit text-slate-800 dark:text-white flex items-center gap-2">
+                Homework Hub
+                <button 
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
+                  title="Refresh Data"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              </h2>
               <p className="text-xs text-slate-400 font-medium">Assign, clone, review and customize study plans</p>
             </div>
             
@@ -804,6 +829,15 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
             >
               <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+            </button>
+
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-450 hover:text-slate-600 dark:text-slate-400 transition-all active:scale-95 disabled:opacity-50"
+              title="Refresh Data"
+            >
+              <RotateCcw className={`w-4.5 h-4.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
