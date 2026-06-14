@@ -21,7 +21,7 @@ def create_app():
     
     # Configure app settings
     app.config['DB_CONNECTION_ERROR'] = None
-    db_uri = os.getenv('DATABASE_URL')
+    db_uri = os.getenv('DATABASE_URL', '').strip()  # .strip() removes accidental newlines from copy-paste
     if not db_uri:
         is_render = os.getenv('RENDER') == 'true'
         is_prod = os.getenv('FLASK_ENV') == 'production'
