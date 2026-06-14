@@ -33,9 +33,23 @@ def create_app():
         except Exception as e:
             app.logger.warning(f"Could not connect to database specified in DATABASE_URL: {e}")
             app.config['DB_CONNECTION_ERROR'] = str(e)
+            
+            # Check if running in a production or Render environment
+            is_render = os.getenv('RENDER') == 'true'
+            is_prod = os.getenv('FLASK_ENV') == 'production'
+            if is_render or is_prod:
+                app.logger.error("FATAL: Database connection failed in production/Render environment. Cannot fall back to SQLite!")
+                raise RuntimeError(f"Database connection failed in production: {e}")
+                
             app.logger.info("Falling back to local SQLite database: cm_learning_hub.db")
             db_uri = 'sqlite:///cm_learning_hub.db'
     else:
+        is_render = os.getenv('RENDER') == 'true'
+        is_prod = os.getenv('FLASK_ENV') == 'production'
+        if is_render or is_prod:
+            app.logger.error("FATAL: DATABASE_URL not set in production/Render environment. Cannot fall back to SQLite!")
+            raise RuntimeError("DATABASE_URL environment variable is required in production.")
+            
         db_uri = 'sqlite:///cm_learning_hub.db'
         app.logger.info("DATABASE_URL not set. Using local SQLite database: cm_learning_hub.db")
 
@@ -162,6 +176,14 @@ def create_app():
             "message": "CM Learning Hub Backend API is running",
             "version": "1.0.0"
         }), 200
+        
+    @app.after_request
+    def add_cache_control_headers(response):
+        # Disable caching for all API responses to prevent session/state leak
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
         
     @app.route('/api/firebase-debug', methods=['GET'])
     def firebase_debug():
