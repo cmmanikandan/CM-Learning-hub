@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -114,7 +115,7 @@ export const Login: React.FC = () => {
     showToast('loading', 'Signing you in…');
 
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: identifier, password }),
@@ -154,7 +155,7 @@ export const Login: React.FC = () => {
 
       showToast('loading', 'Verifying your account…');
 
-      const res  = await fetch('http://127.0.0.1:5000/api/auth/firebase-login', {
+      const res  = await fetch(`${API_BASE}/api/auth/firebase-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken, photoUrl }),

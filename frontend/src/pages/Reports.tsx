@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -216,7 +217,7 @@ export const Reports: React.FC = () => {
       if (reportStudentId === 'all') {
         const results = await Promise.all(
           myStudents.map(async (student) => {
-            const res = await fetch(`http://127.0.0.1:5000/api/attendance/stats?student_id=${student.id}`, { headers });
+            const res = await fetch(`${API_BASE}/api/attendance/stats?student_id=${student.id}`, { headers });
             const stats = await res.json();
             return { student, stats };
           })
@@ -224,7 +225,7 @@ export const Reports: React.FC = () => {
         setAttendanceReport({ type: 'all', data: results });
       } else {
         const student = role === 'student' ? studentProfile : myStudents.find(s => s.id === reportStudentId);
-        const res = await fetch(`http://127.0.0.1:5000/api/attendance/stats?student_id=${reportStudentId}`, { headers });
+        const res = await fetch(`${API_BASE}/api/attendance/stats?student_id=${reportStudentId}`, { headers });
         const stats = await res.json();
         setAttendanceReport({ type: 'single', student, stats });
       }

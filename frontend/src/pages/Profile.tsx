@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { User, School, Mail, Phone, ShieldCheck, CheckCircle, Briefcase, RefreshCw } from 'lucide-react';
@@ -43,7 +44,7 @@ export const Profile: React.FC = () => {
   // Fetch mentors list
   useEffect(() => {
     if (role === 'student') {
-      fetch('http://127.0.0.1:5000/api/users/mentors')
+      fetch(`${API_BASE}/api/users/mentors`)
         .then(res => res.json())
         .then(data => setMentorsList(data))
         .catch(err => console.error("Failed to fetch mentors", err));
@@ -56,7 +57,7 @@ export const Profile: React.FC = () => {
     const formData = new FormData();
     formData.append('photo', file);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/users/upload-photo', {
+      const res = await fetch(`${API_BASE}/api/users/upload-photo`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -74,7 +75,7 @@ export const Profile: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/users/profile', {
+      const res = await fetch(`${API_BASE}/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export const Profile: React.FC = () => {
     if (!selectedMentor) return;
     setIsChangingMentor(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/users/change-mentor', {
+      const res = await fetch(`${API_BASE}/api/users/change-mentor`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

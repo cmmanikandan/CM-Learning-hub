@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 
 // Matches the backend UserProfile interface somewhat
 export interface AuthUser {
@@ -48,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/auth/profile', {
+      const response = await fetch(`${API_BASE}/api/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

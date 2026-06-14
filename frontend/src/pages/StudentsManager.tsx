@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { User, CheckCircle, XCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export const StudentsManager: React.FC = () => {
   const fetchAttendance = (date: string) => {
     setIsLoading(true);
     setError(null);
-    fetch(`http://127.0.0.1:5000/api/attendance?date=${date}`, {
+    fetch(`${API_BASE}/api/attendance?date=${date}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -72,7 +73,7 @@ export const StudentsManager: React.FC = () => {
       return item;
     }));
 
-    fetch('http://127.0.0.1:5000/api/attendance', {
+    fetch(`${API_BASE}/api/attendance`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '../config/api';
 import { ModalPortal } from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -111,7 +112,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/admin/users', {
+      const res = await fetch(`${API_BASE}/api/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -161,7 +162,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
     }
     setIsCreating(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/admin/users/create', {
+      const res = await fetch(`${API_BASE}/api/admin/users/create`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -192,7 +193,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
   const handleDelete = async (user: User) => {
     if (!window.confirm(`Delete "${user.name}"? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/admin/users/${user.id}`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${user.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -222,7 +223,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
     if (!editingUser) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/admin/users/${editingUser.id}`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -263,7 +264,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
     if (newPassword.length < 6) { showError('Password must be ≥ 6 characters.'); return; }
     setIsResetting(true);
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/admin/users/${resetUser.id}/reset-password`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${resetUser.id}/reset-password`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_password: newPassword }),
@@ -292,7 +293,7 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ initialCreateRole, onCre
     if (!selectedStudent) return;
     setIsReassigning(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/admin/reassign', {
+      const res = await fetch(`${API_BASE}/api/admin/reassign`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_id: selectedStudent.id, mentor_id: newMentorId || null }),

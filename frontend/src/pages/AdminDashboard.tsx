@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, GraduationCap, Briefcase, Activity, RefreshCw,
@@ -34,7 +35,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
   const fetchStats = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/admin/stats', {
+      const res = await fetch(`${API_BASE}/api/admin/stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -51,7 +52,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ setActiveTab }) 
   const fetchLeaderboard = async () => {
     setIsLeaderboardLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/users/leaderboard', {
+      const res = await fetch(`${API_BASE}/api/users/leaderboard`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {

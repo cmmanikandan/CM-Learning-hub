@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../config/api';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -50,7 +51,7 @@ export const Settings: React.FC = () => {
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/change-password', {
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

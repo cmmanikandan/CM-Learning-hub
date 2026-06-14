@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useAuth } from './AuthContext';
 
 // Interfaces matching backend tables
@@ -382,7 +383,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user || !token) return;
     const headers = { 'Authorization': `Bearer ${token}` };
 
-    fetch('http://127.0.0.1:5000/api/homework', { headers })
+    fetch(`${API_BASE}/api/homework`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setHomeworkList(data.map(h => ({
@@ -390,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/library', { headers })
+    fetch(`${API_BASE}/api/library`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setLibraryList(data.map(m => ({
@@ -403,7 +404,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/quiz', { headers })
+    fetch(`${API_BASE}/api/quiz`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setQuizList(data.map(q => ({
@@ -411,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/quiz/bank', { headers })
+    fetch(`${API_BASE}/api/quiz/bank`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setQuizBank(data.map(q => ({
@@ -419,7 +420,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/tests', { headers })
+    fetch(`${API_BASE}/api/tests`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setWrittenTests(data.map(t => ({
@@ -427,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/tests/bank', { headers })
+    fetch(`${API_BASE}/api/tests/bank`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setWrittenTestBank(data.map(t => ({
@@ -435,7 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/tests/submissions', { headers })
+    fetch(`${API_BASE}/api/tests/submissions`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setWrittenTestSubmissions(data.map(s => ({
@@ -443,7 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(console.error);
 
-    fetch('http://127.0.0.1:5000/api/notifications', { headers })
+    fetch(`${API_BASE}/api/notifications`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setNotifications(data);
@@ -451,13 +452,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Dynamic Achievements Fetch
     if (user.role === 'mentor' && activeStudent) {
-      fetch(`http://127.0.0.1:5000/api/achievements/student/${activeStudent.id}`, { headers })
+      fetch(`${API_BASE}/api/achievements/student/${activeStudent.id}`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setAchievements(data);
         }).catch(console.error);
     } else if (user.role === 'student') {
-      fetch('http://127.0.0.1:5000/api/achievements', { headers })
+      fetch(`${API_BASE}/api/achievements`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setAchievements(data);
@@ -465,7 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Quiz Submissions Fetch
-    fetch('http://127.0.0.1:5000/api/quiz/submissions', { headers })
+    fetch(`${API_BASE}/api/quiz/submissions`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setQuizSubmissions(data.map(s => ({
@@ -475,7 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Mentor specific: Fetch students
     if (user.role === 'mentor') {
-      fetch('http://127.0.0.1:5000/api/users/my-students', { headers })
+      fetch(`${API_BASE}/api/users/my-students`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -506,14 +507,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Leaderboard Fetch
-    fetch('http://127.0.0.1:5000/api/users/leaderboard', { headers })
+    fetch(`${API_BASE}/api/users/leaderboard`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setLeaderboard(data);
       }).catch(console.error);
 
     // Initial all chat messages fetch
-    fetch('http://127.0.0.1:5000/api/chat/all-messages', { headers })
+    fetch(`${API_BASE}/api/chat/all-messages`, { headers })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setAllChatMessages(data);
@@ -521,13 +522,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Fetch attendance stats
     if (user.role === 'mentor' && activeStudent) {
-      fetch(`http://127.0.0.1:5000/api/attendance/stats?student_id=${activeStudent.id}`, { headers })
+      fetch(`${API_BASE}/api/attendance/stats?student_id=${activeStudent.id}`, { headers })
         .then(res => res.json())
         .then(data => {
           if (data && typeof data.percentage === 'number') setAttendanceStats(data);
         }).catch(console.error);
     } else if (user.role === 'student') {
-      fetch('http://127.0.0.1:5000/api/attendance/stats', { headers })
+      fetch(`${API_BASE}/api/attendance/stats`, { headers })
         .then(res => res.json())
         .then(data => {
           if (data && typeof data.percentage === 'number') setAttendanceStats(data);
@@ -637,7 +638,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user || !token) return;
     const interval = setInterval(() => {
       const headers = { 'Authorization': `Bearer ${token}` };
-      fetch('http://127.0.0.1:5000/api/chat/all-messages', { headers })
+      fetch(`${API_BASE}/api/chat/all-messages`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -657,7 +658,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const addHomework = (hw: Omit<Homework, 'id' | 'createdTime' | 'status'> & { student_ids?: number[] }) => {
-    fetch('http://127.0.0.1:5000/api/homework', {
+    fetch(`${API_BASE}/api/homework`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -700,7 +701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (fields.attachmentUrl !== undefined) payload.attachment_url = fields.attachmentUrl;
     if (fields.remarks !== undefined) payload.remarks = fields.remarks;
     
-    fetch(`http://127.0.0.1:5000/api/homework/${id}`, {
+    fetch(`${API_BASE}/api/homework/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload)
@@ -719,7 +720,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteHomework = (id: number) => {
-    fetch(`http://127.0.0.1:5000/api/homework/${id}`, {
+    fetch(`${API_BASE}/api/homework/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     }).then(res => {
@@ -737,7 +738,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addLibraryMaterial = (mat: Omit<LibraryMaterial, 'id' | 'createdTime' | 'viewsCount' | 'bookmarksCount' | 'isBookmarked'> & { student_ids?: number[] }) => {
-    fetch('http://127.0.0.1:5000/api/library', {
+    fetch(`${API_BASE}/api/library`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -756,7 +757,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteLibraryMaterial = (id: number) => {
-    fetch(`http://127.0.0.1:5000/api/library/${id}`, {
+    fetch(`${API_BASE}/api/library/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     }).then(res => {
@@ -770,7 +771,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       m.id === id ? { ...m, isBookmarked: !m.isBookmarked } : m
     ));
 
-    fetch(`http://127.0.0.1:5000/api/library/${id}/bookmark`, {
+    fetch(`${API_BASE}/api/library/${id}/bookmark`, {
       method: 'POST',
       headers: getHeaders()
     })
@@ -796,7 +797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addQuiz = (quiz: Omit<Quiz, 'id' | 'createdTime' | 'totalMarks'> & { student_ids?: number[]; start_time?: string; end_time?: string }) => {
-    fetch('http://127.0.0.1:5000/api/quiz', {
+    fetch(`${API_BASE}/api/quiz`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -821,7 +822,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const assignQuiz = (quizId: number, assignmentDate: string, payload?: { student_ids?: number[]; start_time?: string; end_time?: string }) => {
-    fetch('http://127.0.0.1:5000/api/quiz/assign', {
+    fetch(`${API_BASE}/api/quiz/assign`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -837,7 +838,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteQuiz = (id: number) => {
-    fetch(`http://127.0.0.1:5000/api/quiz/${id}`, {
+    fetch(`${API_BASE}/api/quiz/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     }).then(res => {
@@ -848,7 +849,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const submitQuiz = async (sub: Omit<QuizSubmission, 'id' | 'studentId' | 'submittedAt'>, answers: any) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/quiz/${sub.quizId}/submit`, {
+      const res = await fetch(`${API_BASE}/api/quiz/${sub.quizId}/submit`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({
@@ -868,7 +869,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addWrittenTest = async (test: Omit<WrittenTest, 'id' | 'createdTime'> & { is_bank?: boolean; student_ids?: number[] }) => {
-    const res = await fetch('http://127.0.0.1:5000/api/tests', {
+    const res = await fetch(`${API_BASE}/api/tests`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -897,7 +898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const assignWrittenTest = async (testId: number, startDate: string, endDate: string, student_ids?: number[]) => {
-    const res = await fetch('http://127.0.0.1:5000/api/tests/assign', {
+    const res = await fetch(`${API_BASE}/api/tests/assign`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -916,7 +917,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteWrittenTest = (id: number) => {
-    fetch(`http://127.0.0.1:5000/api/tests/${id}`, {
+    fetch(`${API_BASE}/api/tests/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     }).then(res => {
@@ -925,7 +926,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitWrittenTest = (testId: number, answerSheetUrl: string, _answerSheetName: string) => {
-    fetch(`http://127.0.0.1:5000/api/tests/${testId}/submit`, {
+    fetch(`${API_BASE}/api/tests/${testId}/submit`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -937,7 +938,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const gradeWrittenSubmission = (subId: number, marks: number, remarks: string) => {
-    fetch(`http://127.0.0.1:5000/api/tests/submissions/${subId}/grade`, {
+    fetch(`${API_BASE}/api/tests/submissions/${subId}/grade`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -954,7 +955,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAllNotificationsRead = () => {
-    fetch('http://127.0.0.1:5000/api/notifications/mark-read', {
+    fetch(`${API_BASE}/api/notifications/mark-read`, {
       method: 'POST',
       headers: getHeaders()
     }).then(res => {
@@ -965,7 +966,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dismissNotification = (id: number) => {
     // Optimistic remove
     setNotifications(prev => prev.filter(n => n.id !== id));
-    fetch(`http://127.0.0.1:5000/api/notifications/${id}`, {
+    fetch(`${API_BASE}/api/notifications/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     }).catch(err => {
@@ -978,7 +979,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllNotifications = () => {
     // Optimistic clear
     setNotifications([]);
-    fetch('http://127.0.0.1:5000/api/notifications/clear-all', {
+    fetch(`${API_BASE}/api/notifications/clear-all`, {
       method: 'DELETE',
       headers: getHeaders()
     }).catch(err => {
@@ -988,7 +989,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const unlockAchievement = (name: string, description: string, _icon: string) => {
-    fetch('http://127.0.0.1:5000/api/achievements', {
+    fetch(`${API_BASE}/api/achievements`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ name, description })
@@ -1000,8 +1001,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchChatMessages = (recipientId?: number) => {
     if (!token) return;
     const url = recipientId 
-      ? `http://127.0.0.1:5000/api/chat?recipient_id=${recipientId}` 
-      : 'http://127.0.0.1:5000/api/chat';
+      ? `${API_BASE}/api/chat?recipient_id=${recipientId}` 
+      : `${API_BASE}/api/chat`;
     fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => {
@@ -1012,7 +1013,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendChatMessage = async (recipientId: number | null, content: string) => {
     if (!token) return;
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1032,7 +1033,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchLeaderboard = () => {
     if (!token) return;
-    fetch('http://127.0.0.1:5000/api/users/leaderboard', { 
+    fetch(`${API_BASE}/api/users/leaderboard`, { 
       headers: { 'Authorization': `Bearer ${token}` } 
     })
       .then(res => res.json())
@@ -1044,7 +1045,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateMentorNotes = async (studentId: number, notes: string) => {
     if (!token) return false;
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/users/${studentId}/mentor-notes`, {
+      const res = await fetch(`${API_BASE}/api/users/${studentId}/mentor-notes`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

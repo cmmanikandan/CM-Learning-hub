@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   User, Mail, Lock, Briefcase, GraduationCap, ArrowRight, Loader2,
@@ -156,7 +157,7 @@ export const Register: React.FC = () => {
       const cred       = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUid = cred.user.uid;
 
-      const res  = await fetch('http://127.0.0.1:5000/api/auth/register', {
+      const res  = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password, role, name, firebase_uid: firebaseUid }),
@@ -195,7 +196,7 @@ export const Register: React.FC = () => {
 
       showToast('loading', 'Registering with Google…');
 
-      const res  = await fetch('http://127.0.0.1:5000/api/auth/register', {
+      const res  = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: generatedUN, email: googleEmail, password: '', role, name: googleName, firebase_uid: firebaseUid }),

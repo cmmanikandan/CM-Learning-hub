@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config/api';
 import { ModalPortal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -223,7 +224,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     if (!aiTopic.trim()) return;
     try {
       setIsGeneratingAI(true);
-      const res = await fetch('http://127.0.0.1:5000/api/quiz/generate', {
+      const res = await fetch(`${API_BASE}/api/quiz/generate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -283,7 +284,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
 
   const handlePreviewQuiz = async (quizId: number) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/quiz/${quizId}`, {
+      const res = await fetch(`${API_BASE}/api/quiz/${quizId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
