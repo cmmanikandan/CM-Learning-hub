@@ -13,6 +13,12 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     
+    # Initialize Firebase status variables for diagnostics
+    app.config['FIREBASE_INIT_STATUS'] = 'Not started'
+    app.config['FIREBASE_INIT_ERROR'] = None
+    app.config['FIREBASE_INIT_KEYS'] = []
+    app.config['FIREBASE_JSON_LEN'] = 0
+    
     # Configure app settings
     db_uri = os.getenv('DATABASE_URL')
     if db_uri:
@@ -50,6 +56,7 @@ def create_app():
         firebase_cred_path = os.path.join(app_dir, firebase_cred_path)
 
     firebase_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+    app.config['FIREBASE_JSON_LEN'] = len(firebase_json) if firebase_json else 0
     
     if not firebase_admin._apps:
         initialized = False
@@ -59,6 +66,7 @@ def create_app():
                 cred = credentials.Certificate(firebase_cred_path)
                 firebase_admin.initialize_app(cred)
                 app.logger.info("Firebase Admin SDK initialized from file.")
+                app.config['FIREBASE_INIT_STATUS'] = 'Initialized from file'
                 initialized = True
             elif firebase_json:
                 app.logger.info(f"Attempting to initialize Firebase from FIREBASE_CREDENTIALS_JSON (len: {len(firebase_json)}).")
@@ -76,6 +84,7 @@ def create_app():
                 import json
                 try:
                     cred_dict = json.loads(clean_json)
+                    app.config['FIREBASE_INIT_KEYS'] = list(cred_dict.keys())
                     app.logger.info(f"Successfully parsed FIREBASE_CREDENTIALS_JSON. Keys present: {list(cred_dict.keys())}")
                     
                     if 'project_id' not in cred_dict:
@@ -84,8 +93,11 @@ def create_app():
                     cred = credentials.Certificate(cred_dict)
                     firebase_admin.initialize_app(cred)
                     app.logger.info("Firebase Admin SDK initialized from env JSON.")
+                    app.config['FIREBASE_INIT_STATUS'] = 'Initialized from env JSON'
                     initialized = True
                 except json.JSONDecodeError as jde:
+                    app.config['FIREBASE_INIT_STATUS'] = 'Failed to parse JSON'
+                    app.config['FIREBASE_INIT_ERROR'] = f"JSONDecodeError: {jde}"
                     app.logger.error(f"JSONDecodeError parsing FIREBASE_CREDENTIALS_JSON: {jde}")
                     app.logger.error(f"Raw FIREBASE_CREDENTIALS_JSON prefix: {clean_json[:50]}...")
                     raise
@@ -93,11 +105,15 @@ def create_app():
                 app.logger.info("No explicit credentials path or JSON env set. Trying default credentials.")
                 firebase_admin.initialize_app()
                 app.logger.info("Firebase Admin SDK initialized with default credentials.")
+                app.config['FIREBASE_INIT_STATUS'] = 'Initialized with default credentials'
                 initialized = True
         except Exception as e:
             import traceback
+            err_msg = f"{e}\n{traceback.format_exc()}"
             app.logger.error(f"Firebase Admin SDK initialization failed: {e}")
             app.logger.error(traceback.format_exc())
+            app.config['FIREBASE_INIT_STATUS'] = 'Failed during initialization'
+            app.config['FIREBASE_INIT_ERROR'] = err_msg
             
         # Verify if initialization was successful and has project ID
         if initialized:
@@ -143,6 +159,26 @@ def create_app():
             "status": "healthy",
             "message": "CM Learning Hub Backend API is running",
             "version": "1.0.0"
+        }), 200
+        
+    @app.route('/api/firebase-debug', methods=['GET'])
+    def firebase_debug():
+        import firebase_admin
+        fb_apps = [a.name for a in firebase_admin._apps.values()] if firebase_admin._apps else []
+        proj_id = None
+        if firebase_admin._apps:
+            try:
+                proj_id = firebase_admin.get_app().project_id
+            except Exception as e:
+                proj_id = f"Error: {e}"
+        
+        return jsonify({
+            "status": app.config.get('FIREBASE_INIT_STATUS'),
+            "error": app.config.get('FIREBASE_INIT_ERROR'),
+            "keys_present": app.config.get('FIREBASE_INIT_KEYS'),
+            "env_json_length": app.config.get('FIREBASE_JSON_LEN'),
+            "firebase_apps": fb_apps,
+            "project_id": proj_id
         }), 200
         
     @app.route('/')
