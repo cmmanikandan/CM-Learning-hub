@@ -45,13 +45,26 @@ def create_app():
     
     # Initialize Firebase Admin SDK
     firebase_cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH')
-    if firebase_cred_path and os.path.exists(firebase_cred_path):
-        if not firebase_admin._apps:
-            cred = credentials.Certificate(firebase_cred_path)
-            firebase_admin.initialize_app(cred)
-        app.logger.info("Firebase Admin SDK initialized.")
-    else:
-        app.logger.warning("FIREBASE_CREDENTIALS_PATH not set or file not found. Firebase Admin SDK NOT initialized.")
+    firebase_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+    
+    if not firebase_admin._apps:
+        try:
+            if firebase_cred_path and os.path.exists(firebase_cred_path):
+                cred = credentials.Certificate(firebase_cred_path)
+                firebase_admin.initialize_app(cred)
+                app.logger.info("Firebase Admin SDK initialized from file.")
+            elif firebase_json:
+                import json
+                cred_dict = json.loads(firebase_json)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                app.logger.info("Firebase Admin SDK initialized from env JSON.")
+            else:
+                # Try default credentials fallback
+                firebase_admin.initialize_app()
+                app.logger.info("Firebase Admin SDK initialized with default credentials.")
+        except Exception as e:
+            app.logger.warning(f"Firebase Admin SDK initialization warning: {e}")
     
     # Import and register blueprints
     from routes.auth import auth_bp
