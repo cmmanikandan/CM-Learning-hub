@@ -14,7 +14,7 @@ load_dotenv()
 from app import create_app
 from models import db, User
 
-FIREBASE_UID = "JkSCaMatbucTYskEp5CpVl4gQtB2"
+FIREBASE_UID = "8eMFRxoOwbMwvF7CSJW8uqPxVMc2"
 ADMIN_EMAIL = "admin@cmlearninghub.com"
 
 app = create_app()
@@ -35,7 +35,7 @@ with app.app_context():
             email=ADMIN_EMAIL,
             firebase_uid=FIREBASE_UID,
             password_hash=generate_password_hash("AdminPassword123!"),
-            role="mentor",
+            role="admin",
             name="System Admin",
             tid=f"TID-ADMIN1",
         )
@@ -46,7 +46,7 @@ with app.app_context():
         # Update Firebase UID
         old_uid = user.firebase_uid
         user.firebase_uid = FIREBASE_UID
-        user.role = "mentor"  # Ensure it stays as mentor/admin
+        user.role = "admin"  # Ensure it stays as admin
         db.session.commit()
         print(f"[SUCCESS] Updated user '{user.name}' ({user.email})")
         print(f"  Role      : {user.role}")
