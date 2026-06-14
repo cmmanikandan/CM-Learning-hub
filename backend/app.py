@@ -192,6 +192,15 @@ def create_app():
         config_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
         masked_config_db_url = re.sub(r':([^@]+)@', ':***@', config_db_url) if config_db_url else 'None'
         
+        # Get users list for debugging
+        from models import User
+        users_list = []
+        try:
+            users = User.query.all()
+            users_list = [{"id": u.id, "email": u.email, "role": u.role, "username": u.username, "name": u.name} for u in users]
+        except Exception as ue:
+            users_list = [f"Error querying users: {ue}"]
+        
         return jsonify({
             "status": app.config.get('FIREBASE_INIT_STATUS'),
             "error": app.config.get('FIREBASE_INIT_ERROR'),
@@ -203,7 +212,8 @@ def create_app():
             "prefix_str_safe": prefix_str.replace('\n', '\\n').replace('\r', '\\r'),
             "env_database_url": masked_db_url,
             "config_database_url": masked_config_db_url,
-            "db_connection_error": app.config.get('DB_CONNECTION_ERROR')
+            "db_connection_error": app.config.get('DB_CONNECTION_ERROR'),
+            "users": users_list
         }), 200
         
     @app.route('/')
