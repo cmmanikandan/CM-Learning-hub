@@ -45,6 +45,10 @@ def create_app():
     
     # Initialize Firebase Admin SDK
     firebase_cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH')
+    if firebase_cred_path and not os.path.isabs(firebase_cred_path):
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        firebase_cred_path = os.path.join(app_dir, firebase_cred_path)
+
     firebase_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
     
     if not firebase_admin._apps:
