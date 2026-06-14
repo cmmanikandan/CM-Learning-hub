@@ -38,21 +38,12 @@ def create_app():
     
     # Connection pool settings for remote PostgreSQL (critical for performance)
     if db_uri.startswith('postgresql'):
-        # Detect if using Transaction pooler (port 6543) vs Session pooler (port 5432)
-        is_transaction_pooler = ':6543/' in db_uri
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'pool_size': 5,           # maintain 5 persistent connections
             'max_overflow': 10,       # allow up to 10 extra temporary connections
             'pool_pre_ping': True,    # auto-reconnect if connection dropped
-            'pool_recycle': 180,      # recycle connections every 3 minutes
-            'connect_args': {
-                'connect_timeout': 10,
-                # Required for Transaction pooler (PgBouncer port 6543)
-                # Without this, SQLAlchemy prepared statements break randomly
-                **({"options": "-c statement_timeout=30000"} if is_transaction_pooler else {})
-            },
-            # Disable prepared statement cache for Transaction pooler compatibility
-            **({"execution_options": {"no_parameters": True}} if is_transaction_pooler else {})
+            'pool_recycle': 600,      # recycle connections every 10 minutes
+            'connect_args': {'connect_timeout': 10}
         }
     
     # Enable CORS
