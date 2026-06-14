@@ -164,6 +164,7 @@ def create_app():
     @app.route('/api/firebase-debug', methods=['GET'])
     def firebase_debug():
         import firebase_admin
+        import os
         fb_apps = [a.name for a in firebase_admin._apps.values()] if firebase_admin._apps else []
         proj_id = None
         if firebase_admin._apps:
@@ -172,13 +173,24 @@ def create_app():
             except Exception as e:
                 proj_id = f"Error: {e}"
         
+        firebase_json = os.getenv('FIREBASE_CREDENTIALS_JSON', '')
+        clean_json = firebase_json.strip()
+        if (clean_json.startswith("'") and clean_json.endswith("'")) or \
+           (clean_json.startswith('"') and clean_json.endswith('"')):
+            clean_json = clean_json[1:-1].strip()
+            
+        prefix_chars = [ord(c) for c in clean_json[:20]]
+        prefix_str = clean_json[:20]
+        
         return jsonify({
             "status": app.config.get('FIREBASE_INIT_STATUS'),
             "error": app.config.get('FIREBASE_INIT_ERROR'),
             "keys_present": app.config.get('FIREBASE_INIT_KEYS'),
             "env_json_length": app.config.get('FIREBASE_JSON_LEN'),
             "firebase_apps": fb_apps,
-            "project_id": proj_id
+            "project_id": proj_id,
+            "prefix_char_codes": prefix_chars,
+            "prefix_str_safe": prefix_str.replace('\n', '\\n').replace('\r', '\\r')
         }), 200
         
     @app.route('/')
