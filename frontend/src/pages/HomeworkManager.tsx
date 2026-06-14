@@ -137,6 +137,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
   const [homeworkItems, setHomeworkItems] = useState([{ id: Date.now(), subject: '', description: '' }]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Student scroll state: active date view
   const [studentActiveDate, setStudentActiveDate] = useState(() => {
@@ -152,7 +153,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
     try {
       setIsUploading(true);
-      const url = await uploadToCloudinary(file, () => {});
+      setUploadProgress(0);
+      const url = await uploadToCloudinary(file, (progress) => {
+        setUploadProgress(progress);
+      });
       setFormData(prev => ({ 
         ...prev, 
         attachmentName: file.name,
@@ -164,6 +168,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
       alert('Failed to upload file. Error: ' + (err.message || err));
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1196,8 +1201,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
                   type="file"
                   onChange={handleFileUpload}
                   disabled={isUploading}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-white focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50"
                 />
+                {isUploading && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-[10px] text-primary-600 dark:text-primary-400 font-bold mb-1">
+                      <span>Uploading...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-primary-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {editingHw && (
