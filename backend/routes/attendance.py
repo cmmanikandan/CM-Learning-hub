@@ -40,7 +40,10 @@ def get_attendance():
     for s in students:
         status = attendance_map.get(s.id)
         if not status:
-            status = 'Absent' if is_past else 'N/A'
+            if s.assigned_date and date_obj < s.assigned_date:
+                status = 'N/A'
+            else:
+                status = 'Absent' if is_past else 'N/A'
         result.append({
             "student_id": s.id,
             "student_name": s.name,
@@ -70,6 +73,9 @@ def get_attendance_stats():
             return jsonify({"message": "Student not found or not assigned to you"}), 404
     else:
         student_id = user_id
+        student = User.query.get(student_id)
+
+    assigned_date = student.assigned_date if student else None
 
     # Get distinct attendance dates
     all_dates_records = db.session.query(Attendance.date).distinct().all()
@@ -94,6 +100,8 @@ def get_attendance_stats():
 
     for dt in sorted(all_dates):
         if dt > today:
+            continue
+        if assigned_date and dt < assigned_date:
             continue
 
         status = record_map.get(dt)

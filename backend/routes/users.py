@@ -89,6 +89,8 @@ def change_mentor():
         
     user = User.query.get(current_user['id'])
     user.mentor_id = new_mentor_id
+    from datetime import datetime
+    user.assigned_date = datetime.utcnow().date()
     db.session.commit()
     
     return jsonify({"message": "Mentor assigned successfully", "mentor": {"id": mentor.id, "name": mentor.name}}), 200

@@ -31,6 +31,7 @@ class User(db.Model):
     streak = db.Column(db.Integer, nullable=False, default=0)
     mentor_notes = db.Column(db.Text, nullable=True)
     bookmarked_material_ids = db.Column(db.Text, nullable=True)
+    assigned_date = db.Column(db.Date, nullable=True)
     
     submissions = db.relationship('QuizSubmission', backref='student', lazy=True)
     test_submissions = db.relationship('WrittenTestSubmission', backref='student', lazy=True)

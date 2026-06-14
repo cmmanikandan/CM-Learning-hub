@@ -187,7 +187,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
       {/* Mentor Selection Modal */}
       <AnimatePresence>
         {showMentorModal && (
-          <ModalPortal onClose={() => setShowMentorModal(false)}>
+          <ModalPortal onClose={() => { /* locked – mentor must be selected */ }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -198,9 +198,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
                 <Briefcase className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               </div>
               <h2 className="text-2xl font-bold font-outfit text-center text-slate-800 dark:text-white mb-2">Welcome, {studentProfile.name}!</h2>
-              <p className="text-center text-slate-500 dark:text-slate-400 mb-8">
+              <p className="text-center text-slate-500 dark:text-slate-400 mb-4">
                 Before you dive into your dashboard, please select a mentor to guide your journey.
               </p>
+              <div className="flex items-center justify-center gap-1.5 mb-6">
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-3 py-1 rounded-full">
+                  ⚠️ This step is required to continue
+                </span>
+              </div>
 
               <div className="space-y-4">
                 <div className="relative group">
@@ -234,12 +239,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ setActiveTab
                   )}
                 </button>
 
-                <button
-                  onClick={() => setShowMentorModal(false)}
-                  className="w-full flex items-center justify-center py-2 px-4 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                >
-                  Skip for now
-                </button>
+
               </div>
             </motion.div>
           </ModalPortal>

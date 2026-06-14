@@ -19,6 +19,39 @@ import {
   Loader2
 } from 'lucide-react';
 
+const mapQuizToCamelCase = (raw: any): Quiz => {
+  return {
+    id: raw.id,
+    quizName: raw.quiz_name,
+    subject: raw.subject,
+    chapter: raw.chapter || '',
+    lesson: raw.lesson || '',
+    difficulty: raw.difficulty || 'Medium',
+    instructions: raw.instructions || '',
+    timeLimit: raw.time_limit || 10,
+    passingMarks: raw.passing_marks || 50,
+    totalMarks: raw.total_marks || 0,
+    is_bank: raw.is_bank,
+    assignment_date: raw.assignment_date,
+    start_time: raw.start_time,
+    end_time: raw.end_time,
+    student_id: raw.student_id,
+    student_name: raw.student_name,
+    createdTime: raw.created_at || '',
+    questions: Array.isArray(raw.questions) ? raw.questions.map((q: any) => ({
+      id: String(q.id),
+      questionType: q.question_type,
+      questionText: q.question_text,
+      options: q.options,
+      matchColumnB: q.match_column_b || q.matchColumnB,
+      correctAnswer: q.correct_answer,
+      explanation: q.explanation,
+      marks: q.marks || 1
+    })) : []
+  };
+};
+
+
 
 const CARD_THEMES = [
   {
@@ -241,8 +274,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
   }, []);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
-  const [cheatWarnings, setCheatWarnings] = useState(0);
-  const [showCheatAlert, setShowCheatAlert] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [quizStartTime, setQuizStartTime] = useState(0);
 
   // Score report state (Student)
@@ -267,7 +299,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setPreviewQuiz(data);
+        setPreviewQuiz(mapQuizToCamelCase(data));
       }
     } catch (err) {
       console.error(err);
@@ -300,37 +332,6 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     }
   ]);
 
-  // Anti-cheating listeners (tab changes)
-  useEffect(() => {
-    if (!activeQuiz) return;
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setCheatWarnings(prev => {
-          const next = prev + 1;
-          setShowCheatAlert(true);
-          return next;
-        });
-      }
-    };
-
-    const handleBlur = () => {
-      setCheatWarnings(prev => {
-        const next = prev + 1;
-        setShowCheatAlert(true);
-        return next;
-      });
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [activeQuiz]);
-
   // Timer loop
   useEffect(() => {
     if (!activeQuiz || timeLeft <= 0) {
@@ -355,11 +356,11 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const fullQuiz = await res.json();
+        const fullQuiz = mapQuizToCamelCase(await res.json());
         setActiveQuiz(fullQuiz);
         setTimeLeft(fullQuiz.timeLimit * 60);
-        setCheatWarnings(0);
         setQuizStartTime(Date.now());
+        setCurrentQuestionIndex(0);
         
         // Check local storage for auto-save
         const autoSaved = localStorage.getItem(`cm_autosave_quiz_${quiz.id}`);
@@ -1240,23 +1241,46 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
         </div>
       )}
 
-      {/* ---------------- ACTIVE QUIZ SCREEN (STUDENT FULLSCREEN SIMULATOR) ---------------- */}
+      {/* ---------------- ACTIVE QUIZ SCREEN (STUDENT INLINE QUESTION CARD) ---------------- */}
       {role === 'student' && activeQuiz && (
-        <ModalPortal>
-          <div className="w-full max-w-3xl bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col justify-between min-h-[90vh]">
-            {/* Header / Timer */}
-            <div className="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+        <div className="w-full max-w-2xl mx-auto space-y-6 animate-fadeIn">
+          {/* Header Card */}
+          <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm relative overflow-hidden bg-white dark:bg-slate-900/60">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-bold text-base font-outfit truncate text-white">{activeQuiz.quizName}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Anti-Cheating Tracking Enabled</p>
+                <span className="text-[10px] font-bold bg-primary-50 text-primary-600 dark:bg-primary-950/20 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                  {activeQuiz.subject}
+                </span>
+                <h3 className="font-extrabold text-lg text-slate-850 dark:text-white mt-2 font-outfit uppercase tracking-wide">
+                  {activeQuiz.quizName}
+                </h3>
+                {activeQuiz.chapter && (
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Chapter: {activeQuiz.chapter}</p>
+                )}
               </div>
 
-              <div className="flex items-center space-x-2 text-warning bg-warning-950/20 px-3 py-1.5 border border-warning-900/30 rounded-xl font-bold text-sm">
-                <Clock className="w-4.5 h-4.5 animate-spin" />
-                <span>
-                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
+              {/* Countdown Timer with premium styling */}
+              {(() => {
+                const totalSecs = activeQuiz.timeLimit * 60;
+                const pct = (timeLeft / totalSecs) * 100;
+                let timerBg = 'bg-success-50 text-success-700 dark:bg-success-950/20 dark:text-success-400 border-success-200/20';
+                let timerIconColor = 'text-success-500';
+                if (pct < 20) {
+                  timerBg = 'bg-rose-50 text-rose-705 dark:bg-rose-950/20 dark:text-rose-400 border-rose-255/20 animate-pulse';
+                  timerIconColor = 'text-rose-505';
+                } else if (pct < 50) {
+                  timerBg = 'bg-amber-50 text-amber-705 dark:bg-amber-950/20 dark:text-amber-400 border-amber-255/20';
+                  timerIconColor = 'text-amber-505';
+                }
+                return (
+                  <div className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-bold text-sm shadow-sm ${timerBg}`}>
+                    <Clock className={`w-4 h-4 ${pct < 20 ? 'animate-spin' : ''} ${timerIconColor}`} />
+                    <span>
+                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Visual Progress Timer Bar */}
@@ -1264,130 +1288,199 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
               const totalSecs = activeQuiz.timeLimit * 60;
               const pct = Math.max(0, Math.min(100, (timeLeft / totalSecs) * 100));
               const barColor = pct < 20 
-                ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' 
+                ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)]' 
                 : pct < 50 
-                ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' 
-                : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
+                ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]' 
+                : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]';
               return (
-                <div className="w-full h-1 bg-slate-850 relative overflow-hidden">
+                <div className="w-full h-1.5 bg-slate-150 dark:bg-slate-800 rounded-full mt-4 overflow-hidden border border-slate-200/10">
                   <div 
-                    className={`h-full ${barColor} transition-all duration-1000 ease-linear`}
+                    className={`h-full ${barColor} transition-all duration-1000 ease-linear rounded-full`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
               );
             })()}
+          </div>
 
-            {/* Questions area */}
-            <div className="p-6 space-y-6 flex-1 max-h-[70vh] overflow-y-auto">
-              {activeQuiz.questions.map((q, idx) => (
-                <div key={q.id} className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-xl space-y-3.5">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="font-bold">Question {idx + 1} of {activeQuiz.questions.length}</span>
-                    <span className="font-semibold">{q.marks} Mark</span>
-                  </div>
-                  
-                  <h4 className="text-base font-bold text-white font-outfit">{q.questionText}</h4>
+          {/* Current Question Card */}
+          {(() => {
+            const q = activeQuiz.questions[currentQuestionIndex];
+            if (!q) return null;
+            return (
+              <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-md bg-white dark:bg-slate-900/40 space-y-4">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px]">
+                    Question {currentQuestionIndex + 1} of {activeQuiz.questions.length}
+                  </span>
+                  <span className="font-bold bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md text-slate-500">
+                    {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
+                  </span>
+                </div>
+                
+                <h4 className="text-base sm:text-lg font-bold text-slate-850 dark:text-white font-outfit leading-snug">
+                  {q.questionText}
+                </h4>
 
-                  {/* Multiple Choice Options */}
-                  {q.questionType === 'mcq' && q.options && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                      {q.options.map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => handleAnswerChange(q.id, opt)}
-                          className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold border transition-all ${
+                {/* Multiple Choice Options stacked vertically to fit mobile layout */}
+                {q.questionType === 'mcq' && q.options && (
+                  <div className="flex flex-col gap-2.5 pt-2">
+                    {q.options.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => handleAnswerChange(q.id, opt)}
+                        className={`w-full text-left px-4 py-3.5 rounded-xl text-xs font-semibold border transition-all ${
+                          quizAnswers[q.id] === opt 
+                            ? 'bg-primary-50 dark:bg-primary-950/20 border-primary-500 text-primary-750 dark:text-primary-400 font-extrabold shadow-sm' 
+                            : 'bg-slate-50/50 dark:bg-slate-850/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[8px] ${
                             quizAnswers[q.id] === opt 
-                              ? 'bg-primary-950/50 border-primary text-white font-bold' 
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                          }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                              ? 'border-primary-500 bg-primary-500 text-white' 
+                              : 'border-slate-300 dark:border-slate-655'
+                          }`}>
+                            {quizAnswers[q.id] === opt && '✓'}
+                          </span>
+                          <span className="break-words max-w-[90%]">{opt}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                  {/* True or False Options */}
-                  {q.questionType === 'true_false' && (
-                    <div className="flex space-x-4 pt-2">
-                      {['true', 'false'].map((val) => (
-                        <button
-                          key={val}
-                          onClick={() => handleAnswerChange(q.id, val)}
-                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold border capitalize transition-all ${
-                            quizAnswers[q.id] === val 
-                              ? 'bg-primary-950/50 border-primary text-white' 
-                              : 'bg-slate-900 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {/* True or False Options stacked vertically */}
+                {q.questionType === 'true_false' && (
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                    {['true', 'false'].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => handleAnswerChange(q.id, val)}
+                        className={`flex-1 py-3.5 px-4 rounded-xl text-xs font-bold border capitalize transition-all ${
+                          quizAnswers[q.id] === val 
+                            ? 'bg-primary-50 dark:bg-primary-950/20 border-primary-500 text-primary-750 dark:text-primary-400 font-extrabold shadow-sm' 
+                            : 'bg-slate-50/50 dark:bg-slate-850/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        {val === 'true' ? 'True' : 'False'}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                  {/* Fill in the Blank option */}
-                  {q.questionType === 'fill_blank' && (
+                {/* Fill in the Blank option */}
+                {q.questionType === 'fill_blank' && (
+                  <div className="pt-2">
                     <input
                       type="text"
                       placeholder="Type your answer here..."
                       value={quizAnswers[q.id] || ''}
                       onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-primary"
+                      className="w-full bg-slate-50/50 dark:bg-slate-850/40 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
                     />
-                  )}
+                  </div>
+                )}
 
-                  {/* Match selection */}
-                  {q.questionType === 'match' && (
-                    <div className="space-y-2 pt-2 text-xs">
-                      <p className="text-slate-400 italic font-medium">Matching Option Helper: type matched response exactly</p>
-                      <input 
-                        type="text"
-                        placeholder="e.g. A->2, B->1"
-                        value={quizAnswers[q.id] || ''}
-                        onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  )}
+                {/* Match selection */}
+                {q.questionType === 'match' && (
+                  <div className="space-y-2 pt-2 text-xs">
+                    <p className="text-slate-400 italic font-medium">Matching Option Helper: type matched response exactly</p>
+                    <input 
+                      type="text"
+                      placeholder="e.g. A->2, B->1"
+                      value={quizAnswers[q.id] || ''}
+                      onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                      className="w-full bg-slate-50/50 dark:bg-slate-850/40 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
+                    />
+                  </div>
+                )}
 
-                  {/* Short answer input */}
-                  {q.questionType === 'short' && (
+                {/* Short answer input */}
+                {q.questionType === 'short' && (
+                  <div className="pt-2">
                     <textarea
                       placeholder="Write your explanation answer details here..."
                       value={quizAnswers[q.id] || ''}
                       onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-primary h-20"
+                      className="w-full bg-slate-50/50 dark:bg-slate-850/40 border border-slate-205 dark:border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all h-24 resize-none"
                     />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Warning popup */}
-            {showCheatAlert && (
-              <div className="mx-6 my-2 p-3 bg-red-950/40 border border-red-900/30 text-red-400 text-xs rounded-xl flex items-center justify-between">
-                <span className="flex items-center font-semibold">
-                  <AlertTriangle className="w-4.5 h-4.5 mr-2 animate-bounce" />
-                  Warning: Leaving full screen or changing tabs is flagged! Warning Count: {cheatWarnings}
-                </span>
-                <button onClick={() => setShowCheatAlert(false)} className="font-bold">✕</button>
+                  </div>
+                )}
               </div>
-            )}
+            );
+          })()}
 
-            {/* Footer submit */}
-            <div className="px-6 py-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-semibold">Auto-save stores progress locally.</span>
-              <button
-                onClick={() => handleQuizSubmit(false)}
-                className="px-6 py-2.5 text-xs font-bold bg-success hover:bg-success-600 text-white rounded-xl shadow-lg transition-all"
-              >
-                Submit Answers
-              </button>
+          {/* Question Grid Map for quick navigation */}
+          <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/40">
+            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 text-left font-outfit tracking-wider">Question Map</p>
+            <div className="flex flex-wrap gap-2 justify-start">
+              {activeQuiz.questions.map((q, idx) => {
+                const isAnswered = quizAnswers[q.id] !== undefined && quizAnswers[q.id] !== '';
+                const isCurrent = idx === currentQuestionIndex;
+                let btnStyle = 'border-slate-200 dark:border-slate-800 text-slate-550 hover:bg-slate-50 dark:hover:bg-slate-800/40';
+                if (isAnswered) {
+                  btnStyle = 'bg-success-50 border-success-200 text-success-700 dark:bg-success-950/20 dark:border-success-900/30 dark:text-success-400';
+                }
+                if (isCurrent) {
+                  btnStyle = 'ring-2 ring-primary-500 border-primary-500 font-extrabold text-primary-600 dark:text-primary-400';
+                }
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setCurrentQuestionIndex(idx)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all flex items-center justify-center ${btnStyle}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </ModalPortal>
+
+          {/* Navigation and Submission actions */}
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <button
+              type="button"
+              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentQuestionIndex === 0}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                currentQuestionIndex === 0 
+                  ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 cursor-not-allowed' 
+                  : 'bg-white dark:bg-slate-805 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              ← Previous
+            </button>
+
+            {currentQuestionIndex < activeQuiz.questions.length - 1 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentQuestionIndex(prev => Math.min(activeQuiz.questions.length - 1, prev + 1))}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-500/10 active:scale-95 transition-all"
+              >
+                Next →
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const answeredCount = Object.keys(quizAnswers).filter(k => quizAnswers[k] !== undefined && quizAnswers[k] !== '').length;
+                  const totalCount = activeQuiz.questions.length;
+                  if (window.confirm(`You have answered ${answeredCount} out of ${totalCount} questions. Are you sure you want to submit?`)) {
+                    handleQuizSubmit(false);
+                  }
+                }}
+                className="px-6 py-2.5 rounded-xl text-xs font-black bg-success-600 hover:bg-success-700 text-white shadow-md shadow-success-500/10 active:scale-95 transition-all"
+              >
+                Submit Quiz ✓
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ---------------- SCORECARD REPORT SCREEN (STUDENT) ---------------- */}

@@ -527,18 +527,20 @@ export const Reports: React.FC = () => {
             <span className="hidden sm:inline">Study Insights</span>
             <span className="sm:hidden">Insights</span>
           </button>
-          <button 
-            onClick={() => setActiveSubTab('attendance')}
-            className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
-              activeSubTab === 'attendance' 
-                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-350'
-            }`}
-          >
-            <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Attendance Reports</span>
-            <span className="sm:hidden">Attendance</span>
-          </button>
+          {role === 'mentor' && (
+            <button 
+              onClick={() => setActiveSubTab('attendance')}
+              className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
+                activeSubTab === 'attendance' 
+                  ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-350'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Attendance Reports</span>
+              <span className="sm:hidden">Attendance</span>
+            </button>
+          )}
           <button 
             onClick={() => setActiveSubTab('homework')}
             className={`flex items-center px-3 py-2 text-xs font-bold rounded-lg transition-all gap-1.5 shrink-0 ${
@@ -719,7 +721,7 @@ export const Reports: React.FC = () => {
         </>
       )}
 
-      {activeSubTab === 'attendance' && (
+      {activeSubTab === 'attendance' && role === 'mentor' && (
         <div className="space-y-6">
           {/* Controls Panel */}
           <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 shadow-sm">

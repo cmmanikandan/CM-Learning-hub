@@ -4,6 +4,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 import firebase_admin.auth as firebase_auth
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -44,11 +45,13 @@ def register():
         sid=sid,
         tid=tid,
         mentor_id=mentor_id if role == 'student' else None,
+        assigned_date=datetime.utcnow().date() if mentor_id and role == 'student' else None,
         school=data.get('school'),
         class_name=data.get('class_name'),
         section=data.get('section'),
         parent_contact=data.get('parent_contact')
     )
+
     
     db.session.add(new_user)
     db.session.commit()
