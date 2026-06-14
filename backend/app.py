@@ -165,6 +165,7 @@ def create_app():
     def firebase_debug():
         import firebase_admin
         import os
+        import re
         fb_apps = [a.name for a in firebase_admin._apps.values()] if firebase_admin._apps else []
         proj_id = None
         if firebase_admin._apps:
@@ -182,6 +183,13 @@ def create_app():
         prefix_chars = [ord(c) for c in clean_json[:20]]
         prefix_str = clean_json[:20]
         
+        # Mask database password
+        db_url = os.getenv('DATABASE_URL', '')
+        masked_db_url = re.sub(r':([^@]+)@', ':***@', db_url) if db_url else 'None (defaulting to local SQLite)'
+        
+        config_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        masked_config_db_url = re.sub(r':([^@]+)@', ':***@', config_db_url) if config_db_url else 'None'
+        
         return jsonify({
             "status": app.config.get('FIREBASE_INIT_STATUS'),
             "error": app.config.get('FIREBASE_INIT_ERROR'),
@@ -190,7 +198,9 @@ def create_app():
             "firebase_apps": fb_apps,
             "project_id": proj_id,
             "prefix_char_codes": prefix_chars,
-            "prefix_str_safe": prefix_str.replace('\n', '\\n').replace('\r', '\\r')
+            "prefix_str_safe": prefix_str.replace('\n', '\\n').replace('\r', '\\r'),
+            "env_database_url": masked_db_url,
+            "config_database_url": masked_config_db_url
         }), 200
         
     @app.route('/')
