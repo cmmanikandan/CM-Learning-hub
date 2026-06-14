@@ -586,7 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           try {
             new Notification(notif.title, {
               body: notif.content,
-              icon: '/favicon.ico'
+              icon: '/favicon.png'
             });
           } catch (e) {
             console.error('Failed to show push notification:', e);
@@ -614,7 +614,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           new Notification(`New Message from ${latest.sender_name}`, {
             body: latest.content,
-            icon: '/favicon.ico'
+            icon: '/favicon.png'
           });
         } catch (e) {
           console.error('Failed to show chat push notification:', e);
