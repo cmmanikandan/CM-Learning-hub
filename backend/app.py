@@ -52,23 +52,64 @@ def create_app():
     firebase_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
     
     if not firebase_admin._apps:
+        initialized = False
         try:
             if firebase_cred_path and os.path.exists(firebase_cred_path):
+                app.logger.info(f"Attempting to initialize Firebase from path: {firebase_cred_path}")
                 cred = credentials.Certificate(firebase_cred_path)
                 firebase_admin.initialize_app(cred)
                 app.logger.info("Firebase Admin SDK initialized from file.")
+                initialized = True
             elif firebase_json:
+                app.logger.info(f"Attempting to initialize Firebase from FIREBASE_CREDENTIALS_JSON (len: {len(firebase_json)}).")
+                # Strip wrapping quotes if any (common copy-paste issue in env vars)
+                clean_json = firebase_json.strip()
+                if (clean_json.startswith("'") and clean_json.endswith("'")) or \
+                   (clean_json.startswith('"') and clean_json.endswith('"')):
+                    app.logger.info("Detected wrapping quotes in FIREBASE_CREDENTIALS_JSON. Removing them.")
+                    clean_json = clean_json[1:-1].strip()
+                
+                # Check JSON structure
+                if not (clean_json.startswith('{') and clean_json.endswith('}')):
+                    app.logger.warning(f"FIREBASE_CREDENTIALS_JSON does not seem to be a valid JSON object structure: starts with '{clean_json[:5]}' and ends with '{clean_json[-5:]}'")
+                
                 import json
-                cred_dict = json.loads(firebase_json)
-                cred = credentials.Certificate(cred_dict)
-                firebase_admin.initialize_app(cred)
-                app.logger.info("Firebase Admin SDK initialized from env JSON.")
+                try:
+                    cred_dict = json.loads(clean_json)
+                    app.logger.info(f"Successfully parsed FIREBASE_CREDENTIALS_JSON. Keys present: {list(cred_dict.keys())}")
+                    
+                    if 'project_id' not in cred_dict:
+                        app.logger.warning("WARNING: 'project_id' is missing from the parsed credential JSON!")
+                    
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                    app.logger.info("Firebase Admin SDK initialized from env JSON.")
+                    initialized = True
+                except json.JSONDecodeError as jde:
+                    app.logger.error(f"JSONDecodeError parsing FIREBASE_CREDENTIALS_JSON: {jde}")
+                    app.logger.error(f"Raw FIREBASE_CREDENTIALS_JSON prefix: {clean_json[:50]}...")
+                    raise
             else:
-                # Try default credentials fallback
+                app.logger.info("No explicit credentials path or JSON env set. Trying default credentials.")
                 firebase_admin.initialize_app()
                 app.logger.info("Firebase Admin SDK initialized with default credentials.")
+                initialized = True
         except Exception as e:
-            app.logger.warning(f"Firebase Admin SDK initialization warning: {e}")
+            import traceback
+            app.logger.error(f"Firebase Admin SDK initialization failed: {e}")
+            app.logger.error(traceback.format_exc())
+            
+        # Verify if initialization was successful and has project ID
+        if initialized:
+            try:
+                fb_app = firebase_admin.get_app()
+                proj_id = fb_app.project_id
+                if not proj_id:
+                    app.logger.warning("WARNING: Firebase App initialized, but project_id is None. ID token verification WILL fail.")
+                else:
+                    app.logger.info(f"Firebase App initialized with project_id: {proj_id}")
+            except Exception as e:
+                app.logger.error(f"Error checking initialized Firebase App details: {e}")
     
     # Import and register blueprints
     from routes.auth import auth_bp
