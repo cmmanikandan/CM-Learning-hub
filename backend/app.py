@@ -164,6 +164,35 @@ def create_app():
             "message": "CM Learning Hub Backend API is running",
             "version": "1.0.0"
         }), 200
+
+    # Lightweight ping endpoint (used by keep-alive thread)
+    @app.route('/api/ping', methods=['GET'])
+    def ping():
+        return jsonify({"pong": True}), 200
+
+    # Keep-alive: ping self every 10 minutes to prevent Render free plan cold starts
+    import threading
+    import time
+    import urllib.request
+
+    def _keep_alive():
+        # Wait 60s after startup before first ping
+        time.sleep(60)
+        render_url = os.getenv('RENDER_EXTERNAL_URL', '')
+        if not render_url:
+            return  # Not on Render, don't ping
+        ping_url = f"{render_url}/api/ping"
+        app.logger.info(f"Keep-alive thread started. Will ping {ping_url} every 10 minutes.")
+        while True:
+            try:
+                with urllib.request.urlopen(ping_url, timeout=10) as resp:
+                    app.logger.debug(f"Keep-alive ping OK: {resp.status}")
+            except Exception as e:
+                app.logger.warning(f"Keep-alive ping failed: {e}")
+            time.sleep(600)  # 10 minutes
+
+    _ka_thread = threading.Thread(target=_keep_alive, daemon=True, name="keep-alive")
+    _ka_thread.start()
         
     @app.route('/api/config/cloudinary', methods=['GET'])
     def cloudinary_config():
