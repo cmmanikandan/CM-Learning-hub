@@ -51,48 +51,6 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
     return new Date().toISOString().split('T')[0];
   });
 
-  const HOMEWORK_SUGGESTIONS = [
-    {
-      subject: "Mathematics",
-      title: "Algebraic Equations Practice",
-      description: "Complete the worksheet on linear equations. Solve exercises 1-15 showing all steps.",
-      priority: "High" as const,
-      estimatedTime: 45,
-      remarks: "Focus on variable isolation and balancing equations."
-    },
-    {
-      subject: "Physics",
-      title: "Light Refraction Problems",
-      description: "Read chapter 6 on refraction. Solve refraction indices questions 1 to 10 on index formulas.",
-      priority: "Medium" as const,
-      estimatedTime: 30,
-      remarks: "Remember Snell's law formula: n1 sin(i) = n2 sin(r)."
-    },
-    {
-      subject: "Chemistry",
-      title: "Balancing Chemical Equations",
-      description: "Balance the 10 chemical reaction equations provided in the handout and state reaction types.",
-      priority: "Medium" as const,
-      estimatedTime: 30,
-      remarks: "Review oxidation states if stuck."
-    },
-    {
-      subject: "Biology",
-      title: "Photosynthesis Diagram & Summary",
-      description: "Draw a clean diagram of a plant chloroplast showing light reactions. Write short summaries of the Calvin cycle.",
-      priority: "Low" as const,
-      estimatedTime: 40,
-      remarks: "Color coding the stages will earn extra credit."
-    },
-    {
-      subject: "English",
-      title: "Grammar & Tenses Revision",
-      description: "Write a short essay (200 words) using past perfect continuous and future progressive tenses describing a journey.",
-      priority: "Low" as const,
-      estimatedTime: 25,
-      remarks: "Check verb agreement carefully."
-    }
-  ];
 
   const renderCalendar = () => {
     const today = new Date();
@@ -653,46 +611,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
                         💡
                       </div>
                       <p className="text-sm font-bold text-slate-700 dark:text-slate-300 font-outfit">No homework assigned for this day!</p>
-                      <p className="text-xs text-slate-400 mt-1">Get recommendations or create homework templates below.</p>
-                      
-                      {/* Suggestions list */}
-                      <div className="mt-6 w-full max-w-lg space-y-2">
-                        <p className="text-[10px] text-left uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />
-                          AI Suggestions
-                        </p>
-                        {HOMEWORK_SUGGESTIONS.map((sug, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                date: selectedScheduleDate,
-                                homeworkType: "School Homework",
-                                priority: sug.priority,
-                                estimatedTime: sug.estimatedTime,
-                                remarks: sug.remarks,
-                                attachmentName: "",
-                                attachmentUrl: ""
-                              });
-                              setHomeworkItems([{ id: Date.now(), subject: sug.subject, description: sug.description }]);
-                              setShowCreateModal(true);
-                            }}
-                            className="w-full text-left p-3.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/60 border border-slate-150 dark:border-slate-800 rounded-xl transition-all hover:scale-[1.01] flex items-center justify-between gap-4 group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <span className="text-[9px] font-black uppercase text-primary-500 bg-primary-50 dark:bg-primary-950/30 px-1.5 py-0.5 rounded">
-                                {sug.subject}
-                              </span>
-                              <h5 className="font-extrabold text-xs text-slate-800 dark:text-white mt-1 group-hover:text-primary-500 transition-colors font-outfit">{sug.title}</h5>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">{sug.description}</p>
-                            </div>
-                            <span className="text-[10px] font-bold text-primary-500 shrink-0 group-hover:translate-x-1 transition-transform">
-                              Use →
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-xs text-slate-400 mt-1">Use the "Assign Homework" button above to add new assignments.</p>
                     </div>
                   )}
                 </div>

@@ -16,8 +16,7 @@ import {
   Calendar, 
   Clock, 
   Award,
-  AlertTriangle,
-  Sparkles
+  AlertTriangle
 } from 'lucide-react';
 
 const LiveCountdown: React.FC<{ startTime?: string; endTime?: string; onUpdate?: () => void }> = ({ startTime, endTime, onUpdate }) => {
@@ -140,41 +139,6 @@ const CARD_THEMES = [
 
 const getCardTheme = (index: number) => CARD_THEMES[index % CARD_THEMES.length];
 
-const TEST_SUGGESTIONS = [
-  {
-    testName: "Electromagnetism written exam",
-    subject: "Physics",
-    testType: "Chapter Test" as const,
-    description: "Written exam covering Faraday's Law, Lenz's Law, and electromagnetic induction. Detailed solutions must be drawn.",
-    instructions: "Use the standard A4 answer sheet. Show all steps and vector equations. Draw clean circuit diagrams.",
-    duration: 60,
-    totalMarks: 50,
-    questionPaperName: "physics_electromagnetism_test.pdf",
-    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
-  },
-  {
-    testName: "Organic Chemistry mechanisms test",
-    subject: "Chemistry",
-    testType: "Chapter Test" as const,
-    description: "Written paper on reaction mechanisms of alkenes, alkynes, and aromatic compounds.",
-    instructions: "Show arrow pushing mechanisms for all reactions. Draw clear chemical structures.",
-    duration: 90,
-    totalMarks: 75,
-    questionPaperName: "chemistry_organic_mechanisms_test.pdf",
-    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
-  },
-  {
-    testName: "Calculus Limits & Derivatives Exam",
-    subject: "Mathematics",
-    testType: "Unit Test" as const,
-    description: "Solve limits, derivatives using first principles, and chain rule applications.",
-    instructions: "Show all algebraic simplifications. No calculators allowed.",
-    duration: 45,
-    totalMarks: 40,
-    questionPaperName: "math_calculus_limits_test.pdf",
-    questionPaperUrl: "https://res.cloudinary.com/demo/image/upload/v1570975853/sample.pdf"
-  }
-];
 
 interface TestManagerProps {
   showCreateModal: boolean;
@@ -253,9 +217,6 @@ export const TestManager: React.FC<TestManagerProps> = ({
     return new Date().toISOString().split('T')[0];
   });
 
-  // Preset suggestions pre-fill state
-  const [presetPaperUrl, setPresetPaperUrl] = useState('');
-  const [presetPaperName, setPresetPaperName] = useState('');
 
   // Form states for test creation
   const [testName, setTestName] = useState('');
@@ -291,21 +252,6 @@ export const TestManager: React.FC<TestManagerProps> = ({
 
   const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
 
-  const handleApplySuggestion = (sug: typeof TEST_SUGGESTIONS[0]) => {
-    setTestName(sug.testName);
-    setSubject(sug.subject);
-    setTestType(sug.testType);
-    setDescription(sug.description);
-    setInstructions(sug.instructions);
-    setDuration(sug.duration);
-    setTotalMarks(sug.totalMarks);
-    setPresetPaperUrl(sug.questionPaperUrl);
-    setPresetPaperName(sug.questionPaperName);
-    setStartDate(selectedScheduleDate);
-    setEndDate(selectedScheduleDate);
-    setIsBank(false);
-    setShowCreateModal(true);
-  };
 
   const renderCalendar = () => {
     const today = new Date();
@@ -349,15 +295,15 @@ export const TestManager: React.FC<TestManagerProps> = ({
   const handleCreateTestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!testName) return;
-    if (!questionPaperFile && !presetPaperUrl) {
-      alert("Please upload a question paper or select a suggestion preset.");
+    if (!questionPaperFile) {
+      alert("Please upload a question paper.");
       return;
     }
 
     try {
       setIsUploading(true);
-      let paperUrl = presetPaperUrl;
-      let paperName = presetPaperName;
+      let paperUrl = '';
+      let paperName = '';
 
       if (questionPaperFile) {
         setUploadProgress(0);
@@ -395,8 +341,6 @@ export const TestManager: React.FC<TestManagerProps> = ({
       // Reset Form
       setTestName('');
       setQuestionPaperFile(null);
-      setPresetPaperUrl('');
-      setPresetPaperName('');
       setDescription('');
       setInstructions('');
       setIsBank(true);
@@ -594,38 +538,8 @@ export const TestManager: React.FC<TestManagerProps> = ({
                       </p>
                       <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
                     </div>
-                  </div>
-
-                  {/* Suggestions Panel */}
-                  <div className="glass-panel p-5 rounded-2xl flex flex-col">
-                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                      <Sparkles className="w-4.5 h-4.5 text-primary-500 animate-pulse" />
-                      <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
-                        Preset Suggestions
-                      </h3>
-                    </div>
-                    <p className="text-[10px] text-slate-450 font-semibold mb-3 leading-tight">
-                      Quickly pre-fill and assign a preset test template for {selectedScheduleDate}:
-                    </p>
-                    <div className="space-y-2.5">
-                      {TEST_SUGGESTIONS.map((sug, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-xl flex items-center justify-between gap-3 hover:border-primary-200 transition-all">
-                          <div className="min-w-0">
-                            <span className="text-[9px] font-black uppercase text-primary-500 tracking-wider">{sug.subject}</span>
-                            <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">{sug.testName}</h4>
-                            <p className="text-[9px] text-slate-400 font-medium">{sug.testType} • {sug.duration}m • {sug.totalMarks} Marks</p>
-                          </div>
-                          <button
-                            onClick={() => handleApplySuggestion(sug)}
-                            className="px-2.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[10px] font-bold shadow-sm shrink-0 active:scale-95 transition-all"
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
+              </div>
 
                 {/* Day's Assignments list */}
                 <div className="lg:col-span-2 space-y-4">
@@ -747,7 +661,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                         <Clock className="w-6 h-6 text-slate-400" />
                       </div>
                       <h3 className="font-bold text-slate-700 dark:text-slate-350 font-outfit text-base">No Tests Scheduled</h3>
-                      <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no written tests assigned for {selectedScheduleDate}. Apply one of our preset suggestions on the left, or schedule from Test Bank!</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no written tests assigned for {selectedScheduleDate}. Schedule from Test Bank or create a template!</p>
                     </div>
                   )}
                 </div>
@@ -1545,24 +1459,16 @@ export const TestManager: React.FC<TestManagerProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Question Paper File (PDF/Image)</label>
-                {presetPaperUrl && (
-                  <div className="mb-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-between text-xs text-slate-600">
-                    <span className="font-bold truncate max-w-[200px]">{presetPaperName}</span>
-                    <button type="button" onClick={() => { setPresetPaperUrl(''); setPresetPaperName(''); }} className="text-danger font-bold">Clear Preset</button>
-                  </div>
-                )}
                 <input 
                   type="file" 
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       setQuestionPaperFile(e.target.files[0]);
-                      setPresetPaperUrl('');
-                      setPresetPaperName('');
                     }
                   }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-800 dark:text-slate-300"
                   accept=".pdf,image/*"
-                  required={!presetPaperUrl}
+                  required
                 />
               </div>
 
@@ -1589,7 +1495,7 @@ export const TestManager: React.FC<TestManagerProps> = ({
                 </label>
                 <div className="flex space-x-2">
                   <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 focus:outline-none" disabled={isUploading}>Cancel</button>
-                  <button type="submit" className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 focus:outline-none flex items-center" disabled={isUploading || (!questionPaperFile && !presetPaperUrl)}>
+                  <button type="submit" className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-primary-600 hover:bg-primary-700 focus:outline-none flex items-center" disabled={isUploading || !questionPaperFile}>
                     {isUploading ? (isBank ? 'Saving...' : 'Scheduling...') : (isBank ? 'Save Test' : 'Schedule')}
                   </button>
                 </div>

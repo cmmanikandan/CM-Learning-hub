@@ -10,7 +10,6 @@ import {
   AlertTriangle, 
   Award,
   RotateCcw,
-  Sparkles,
   Upload,
   Download,
   Calendar,
@@ -215,44 +214,6 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
 
   const uniqueClasses = Array.from(new Set((myStudents || []).map(s => s.className || '').filter(Boolean)));
 
-  // AI assistant states
-  const [aiTopic, setAiTopic] = useState('');
-  const [aiCount, setAiCount] = useState(3);
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-
-  const generateAIQuestions = async () => {
-    if (!aiTopic.trim()) return;
-    try {
-      setIsGeneratingAI(true);
-      const res = await fetch(`${API_BASE}/api/quiz/generate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ topic: aiTopic, subject: subject, count: aiCount })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const generated = data.questions.map((q: any, index: number) => ({
-          id: 'q_gen_' + Date.now() + '_' + index,
-          questionType: q.question_type,
-          questionText: q.question_text,
-          options: q.options || [],
-          correctAnswer: q.correct_answer,
-          explanation: q.explanation || '',
-          marks: q.marks || 1
-        }));
-        setQuestions(prev => [...prev.filter(q => q.questionText !== ''), ...generated]);
-        setAiTopic('');
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate questions.");
-    } finally {
-      setIsGeneratingAI(false);
-    }
-  };
 
   // Active student view states
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
@@ -578,101 +539,6 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
     setShowCreateModal(false);
   };
 
-  const QUIZ_SUGGESTIONS = [
-    {
-      subject: "Mathematics",
-      quizName: "Algebra Basics Quiz",
-      chapter: "Algebra",
-      lesson: "Equations",
-      difficulty: "Medium" as const,
-      timeLimit: 15,
-      passingMarks: 50,
-      totalMarks: 4,
-      questions: [
-        {
-          id: "sq1",
-          questionType: "mcq" as const,
-          questionText: "Solve for x: 2x + 5 = 15",
-          options: ["3", "5", "10", "15"],
-          correctAnswer: "5",
-          explanation: "Subtract 5 from both sides to get 2x = 10, then divide by 2.",
-          marks: 2
-        },
-        {
-          id: "sq2",
-          questionType: "mcq" as const,
-          questionText: "What is the value of x^2 - 4 when x = 3?",
-          options: ["5", "9", "4", "3"],
-          correctAnswer: "5",
-          explanation: "3^2 - 4 = 9 - 4 = 5.",
-          marks: 2
-        }
-      ]
-    },
-    {
-      subject: "Physics",
-      quizName: "Optics & Light Quiz",
-      chapter: "Optics",
-      lesson: "Refraction",
-      difficulty: "Medium" as const,
-      timeLimit: 10,
-      passingMarks: 60,
-      totalMarks: 5,
-      questions: [
-        {
-          id: "sq3",
-          questionType: "true_false" as const,
-          questionText: "Light travels faster in water than in air.",
-          options: [],
-          correctAnswer: "false",
-          explanation: "Light travels slower in denser mediums like water than in air.",
-          marks: 5
-        }
-      ]
-    },
-    {
-      subject: "Chemistry",
-      quizName: "Chemical Bonds Intro",
-      chapter: "Bonds",
-      lesson: "Covalent Bonds",
-      difficulty: "Easy" as const,
-      timeLimit: 12,
-      passingMarks: 50,
-      totalMarks: 2,
-      questions: [
-        {
-          id: "sq4",
-          questionType: "fill_blank" as const,
-          questionText: "Water molecules are held together by ___ bonds.",
-          options: [],
-          correctAnswer: "covalent",
-          explanation: "Hydrogen and oxygen share electrons, forming covalent bonds.",
-          marks: 2
-        }
-      ]
-    }
-  ];
-
-  const handleApplySuggestion = (sug: typeof QUIZ_SUGGESTIONS[0]) => {
-    setQuizName(sug.quizName);
-    setSubject(sug.subject);
-    setChapter(sug.chapter);
-    setLesson(sug.lesson);
-    setDifficulty(sug.difficulty);
-    setTimeLimit(sug.timeLimit);
-    setPassingMarks(sug.passingMarks);
-    setIsBank(false);
-    setQuestions(sug.questions.map((q, idx) => ({
-      id: 'q_' + Date.now() + '_' + idx,
-      questionType: q.questionType,
-      questionText: q.questionText,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
-      explanation: q.explanation,
-      marks: q.marks
-    })));
-    setShowCreateModal(true);
-  };
 
   const renderCalendar = () => {
     const today = new Date();
@@ -809,36 +675,6 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                     <p>Selected Date: <strong className="text-primary-500">{selectedScheduleDate}</strong></p>
                   </div>
                 </div>
-
-                {/* Suggestions Panel */}
-                <div className="glass-panel p-5 rounded-2xl flex flex-col">
-                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <Sparkles className="w-4.5 h-4.5 text-primary-500 animate-pulse" />
-                    <h3 className="font-extrabold text-sm text-slate-850 dark:text-white font-outfit">
-                      Preset Suggestions
-                    </h3>
-                  </div>
-                  <p className="text-[10px] text-slate-450 font-semibold mb-3 leading-tight">
-                    Quickly pre-fill and assign a preset quiz template for {selectedScheduleDate}:
-                  </p>
-                  <div className="space-y-2.5">
-                    {QUIZ_SUGGESTIONS.map((sug, idx) => (
-                      <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-xl flex items-center justify-between gap-3 hover:border-primary-200 transition-all">
-                        <div className="min-w-0">
-                          <span className="text-[9px] font-black uppercase text-primary-500 tracking-wider">{sug.subject}</span>
-                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">{sug.quizName}</h4>
-                          <p className="text-[9px] text-slate-400 font-medium">{sug.chapter} • {sug.timeLimit}m • {sug.totalMarks} Marks</p>
-                        </div>
-                        <button
-                          onClick={() => handleApplySuggestion(sug)}
-                          className="px-2.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[10px] font-bold shadow-sm shrink-0 active:scale-95 transition-all"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               {/* Day's Assignments list */}
@@ -962,7 +798,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
                       <Clock className="w-6 h-6 text-slate-400" />
                     </div>
                     <h3 className="font-bold text-slate-700 dark:text-slate-350 font-outfit text-base">No Quizzes Scheduled</h3>
-                    <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no quizzes assigned for {selectedScheduleDate}. Apply one of our suggestions on the left, or create a template to get started!</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-455 mt-1 max-w-xs leading-relaxed">There are no quizzes assigned for {selectedScheduleDate}. Create a template to get started!</p>
                   </div>
                 )}
               </div>
@@ -1556,44 +1392,6 @@ export const QuizManager: React.FC<QuizManagerProps> = ({
               </div>
 
               <form onSubmit={saveCreatedQuiz} className="p-6 overflow-y-auto space-y-4 grow">
-                {/* AI Question Generator Panel */}
-                <div className="p-4 bg-gradient-to-r from-primary-500/10 via-purple-500/5 to-transparent border border-primary-200/40 rounded-2xl space-y-3 shadow-sm animate-fadeIn">
-                  <div className="flex items-center space-x-2 text-primary-750 dark:text-primary-400 font-extrabold text-xs">
-                    <Sparkles className="w-4.5 h-4.5 animate-pulse" />
-                    <span>AI Quiz Builder Assistant</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-relaxed">
-                    Type a chapter topic or keywords (e.g. covalent bonding, fractions, forces) and select count to instantly create dynamic questions.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-                    <input
-                      type="text"
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      placeholder="e.g. covalent bonding, refraction"
-                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary-500"
-                    />
-                    <select
-                      value={aiCount}
-                      onChange={(e) => setAiCount(Number(e.target.value))}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-650 focus:outline-none w-20"
-                    >
-                      <option value="1">1 Q</option>
-                      <option value="2">2 Qs</option>
-                      <option value="3">3 Qs</option>
-                      <option value="4">4 Qs</option>
-                      <option value="5">5 Qs</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={generateAIQuestions}
-                      disabled={isGeneratingAI || !aiTopic.trim()}
-                      className="px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-750 disabled:opacity-50 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center"
-                    >
-                      {isGeneratingAI ? 'Generating...' : 'Build Quiz'}
-                    </button>
-                  </div>
-                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Quiz Title</label>

@@ -14,7 +14,7 @@ export const LandingPage: React.FC = () => {
     {
       icon: <Activity className="w-6 h-6 text-amber-500" />,
       title: 'Real-time Analytics',
-      description: 'Track your performance visually. Identify weak areas with our AI-driven competency mapping.',
+      description: 'Track your performance visually. Identify weak areas with our advanced competency mapping.',
       color: 'bg-amber-50 dark:bg-amber-900/20'
     },
     {
