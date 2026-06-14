@@ -22,34 +22,12 @@ def create_app():
     # Configure app settings
     app.config['DB_CONNECTION_ERROR'] = None
     db_uri = os.getenv('DATABASE_URL')
-    if db_uri:
-        from sqlalchemy import create_engine
-        try:
-            # Try to connect with a longer timeout
-            connect_args = {"connect_timeout": 15} if db_uri.startswith("postgresql") else {}
-            engine = create_engine(db_uri, connect_args=connect_args)
-            with engine.connect() as conn:
-                app.logger.info("Successfully connected to the remote database.")
-        except Exception as e:
-            app.logger.warning(f"Could not connect to database specified in DATABASE_URL: {e}")
-            app.config['DB_CONNECTION_ERROR'] = str(e)
-            
-            # Check if running in a production or Render environment
-            is_render = os.getenv('RENDER') == 'true'
-            is_prod = os.getenv('FLASK_ENV') == 'production'
-            if is_render or is_prod:
-                app.logger.error("FATAL: Database connection failed in production/Render environment. Cannot fall back to SQLite!")
-                raise RuntimeError(f"Database connection failed in production: {e}")
-                
-            app.logger.info("Falling back to local SQLite database: cm_learning_hub.db")
-            db_uri = 'sqlite:///cm_learning_hub.db'
-    else:
+    if not db_uri:
         is_render = os.getenv('RENDER') == 'true'
         is_prod = os.getenv('FLASK_ENV') == 'production'
         if is_render or is_prod:
-            app.logger.error("FATAL: DATABASE_URL not set in production/Render environment. Cannot fall back to SQLite!")
+            app.logger.error("FATAL: DATABASE_URL not set in production/Render environment.")
             raise RuntimeError("DATABASE_URL environment variable is required in production.")
-            
         db_uri = 'sqlite:///cm_learning_hub.db'
         app.logger.info("DATABASE_URL not set. Using local SQLite database: cm_learning_hub.db")
 
@@ -57,6 +35,16 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-key-cm-hub')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
+    
+    # Connection pool settings for remote PostgreSQL (critical for performance)
+    if db_uri.startswith('postgresql'):
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 5,          # maintain 5 persistent connections
+            'max_overflow': 10,      # allow up to 10 extra temporary connections
+            'pool_pre_ping': True,   # auto-reconnect if connection dropped
+            'pool_recycle': 300,     # recycle connections every 5 minutes
+            'connect_args': {'connect_timeout': 10}
+        }
     
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -250,62 +238,32 @@ def create_app():
     def index():
         return "CM Learning Hub Backend API - Please use /api/health or frontend client.", 200
 
-    # Ensure tables exist in dev environment
+    # Ensure tables exist
     with app.app_context():
         try:
             db.create_all()
             
-            # Failsafe: check and fix admin credentials/role on startup
             from werkzeug.security import generate_password_hash
             
-            mentor = User.query.filter_by(email="mentor@cmlearninghub.com").first()
-            if not mentor:
-                mentor = User(
-                    username="mentor_test",
-                    email="mentor@cmlearninghub.com",
-                    password_hash=generate_password_hash("MentorPassword123!"),
-                    role="mentor",
-                    name="Test Mentor",
-                    tid="TID-MENTOR1"
-                )
-                db.session.add(mentor)
-                db.session.flush()
-
-            # Resolve duplicate admins to prevent UniqueViolation
-            admins_to_clean = User.query.filter((User.email == "admin@cmlearninghub.com") | (User.username == "admin")).all()
-            if len(admins_to_clean) > 1:
-                app.logger.info(f"Failsafe: Found {len(admins_to_clean)} duplicate admin users. Cleaning up...")
-                # Reassign students from all conflicting admins to mentor
-                for a in admins_to_clean:
-                    students = User.query.filter_by(mentor_id=a.id).all()
-                    for s in students:
-                        s.mentor_id = mentor.id
-                    db.session.delete(a)
-                db.session.commit()
-                admin = None
-            elif len(admins_to_clean) == 1:
-                admin = admins_to_clean[0]
-            else:
-                admin = None
-
-            if admin:
-                # Always ensure correct admin role and credentials
-                admin.role = "admin"
-                admin.username = "admin"
-                admin.email = "admin@cmlearninghub.com"
-                admin.name = "System Admin"
-                admin.password_hash = generate_password_hash("AdminPassword123!")
-                admin.tid = None
+            # Only run seeding/failsafe if admin is missing (avoids slow queries on every restart)
+            admin = User.query.filter_by(email="admin@cmlearninghub.com").first()
+            if not admin:
+                app.logger.info("Admin user missing — running first-time setup...")
                 
-                # Reassign admin's students to the mentor
-                students = User.query.filter_by(mentor_id=admin.id).all()
-                for s in students:
-                    s.mentor_id = mentor.id
-                
-                db.session.commit()
-                app.logger.info("Failsafe: Verified and updated admin to admin role & password.")
-            else:
-                # Create default admin if missing
+                # Ensure default mentor exists
+                mentor = User.query.filter_by(email="mentor@cmlearninghub.com").first()
+                if not mentor:
+                    mentor = User(
+                        username="mentor_test",
+                        email="mentor@cmlearninghub.com",
+                        password_hash=generate_password_hash("MentorPassword123!"),
+                        role="mentor",
+                        name="Test Mentor",
+                        tid="TID-MENTOR1"
+                    )
+                    db.session.add(mentor)
+                    db.session.flush()
+
                 admin = User(
                     username="admin",
                     email="admin@cmlearninghub.com",
@@ -315,49 +273,15 @@ def create_app():
                 )
                 db.session.add(admin)
                 db.session.commit()
-                app.logger.info("Failsafe: Created admin@cmlearninghub.com user.")
-
-            # Failsafe for user's Google account
+                app.logger.info("First-time setup: Created admin user.")
+            
+            # Ensure Google account has admin role (lightweight single query)
             google_admin = User.query.filter_by(email="manikandanprabhu37@gmail.com").first()
             if google_admin and google_admin.role != "admin":
                 google_admin.role = "admin"
                 db.session.commit()
-                app.logger.info("Failsafe: Promoted Google account manikandanprabhu37@gmail.com to admin role.")
-
-            if User.query.count() <= 2: # only admin and mentor exist
-                app.logger.info("SQLite database is empty, auto-seeding default students...")
+                app.logger.info("Promoted manikandanprabhu37@gmail.com to admin role.")
                 
-                # Create default student (no mentor)
-                student = User(
-                    username="studenttest",
-                    email="student@cmlearninghub.com",
-                    password_hash=generate_password_hash("student123"),
-                    role="student",
-                    name="Student Test",
-                    school="Westside Academy",
-                    class_name="Grade 10",
-                    section="Section B",
-                    parent_contact="+1 (555) 019-2834"
-                )
-                db.session.add(student)
-                
-                # Create default student 1 assigned to mentor 1
-                student1 = User(
-                    username="test_student_hw_1",
-                    email="student_hw_1@test.com",
-                    password_hash=generate_password_hash("student123"),
-                    role="student",
-                    name="Test Student 1",
-                    school="Westside Academy",
-                    class_name="Grade 10",
-                    section="Section B",
-                    parent_contact="+1 (555) 019-2834",
-                    mentor_id=mentor.id
-                )
-                db.session.add(student1)
-
-                db.session.commit()
-                app.logger.info("Default users seeded successfully!")
         except Exception as e:
             db.session.rollback()
             app.logger.warning(f"Could not automatically create/seed database tables: {e}")

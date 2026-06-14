@@ -35,6 +35,9 @@ def get_all_users():
         return jsonify({"message": "Unauthorized"}), 403
 
     users = User.query.all()
+    # Pre-build mentor lookup dict to avoid N+1 queries
+    mentor_lookup = {u.id: u.name for u in users if u.role == 'mentor'}
+    
     mentors = []
     students = []
     admins = []
@@ -61,8 +64,7 @@ def get_all_users():
             user_data['student_count'] = len(u.students_assigned)
             mentors.append(user_data)
         elif u.role == 'student':
-            mentor = User.query.get(u.mentor_id) if u.mentor_id else None
-            user_data['mentor_name'] = mentor.name if mentor else "Unassigned"
+            user_data['mentor_name'] = mentor_lookup.get(u.mentor_id, "Unassigned") if u.mentor_id else "Unassigned"
             students.append(user_data)
         elif u.role == 'admin':
             admins.append(user_data)

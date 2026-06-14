@@ -13,6 +13,11 @@ def recalculate_student_streak(student_id):
     student = User.query.get(student_id)
     if not student:
         return 0
+    
+    today = datetime.utcnow().date()
+    # Throttle: skip if streak was already recalculated today
+    if hasattr(student, 'streak_last_calculated') and student.streak_last_calculated == today:
+        return student.streak
         
     m_id = student.mentor_id
     if m_id:
@@ -26,7 +31,6 @@ def recalculate_student_streak(student_id):
         return 0
         
     completed_dates = {hw.date for hw in completed_hws}
-    today = datetime.utcnow().date()
     yesterday = today - timedelta(days=1)
     
     if today not in completed_dates and yesterday not in completed_dates:
