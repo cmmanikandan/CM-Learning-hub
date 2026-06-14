@@ -218,14 +218,24 @@ def create_app():
                 app.logger.info("SQLite database is empty, auto-seeding default users...")
                 from werkzeug.security import generate_password_hash
                 
-                # Create default mentor
-                mentor = User(
-                    username="admin_test",
+                # Create default admin
+                admin = User(
+                    username="admin",
                     email="admin@cmlearninghub.com",
                     password_hash=generate_password_hash("AdminPassword123!"),
+                    role="admin",
+                    name="System Admin"
+                )
+                db.session.add(admin)
+
+                # Create default mentor
+                mentor = User(
+                    username="mentor_test",
+                    email="mentor@cmlearninghub.com",
+                    password_hash=generate_password_hash("MentorPassword123!"),
                     role="mentor",
-                    name="System Admin",
-                    tid="TID-ADMIN1"
+                    name="Test Mentor",
+                    tid="TID-MENTOR1"
                 )
                 db.session.add(mentor)
                 db.session.flush() # Get mentor ID
